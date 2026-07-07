@@ -120,6 +120,10 @@
         <label><input type="checkbox" id="sendJ" checked> 中学生</label>&nbsp;&nbsp;&nbsp;&nbsp;
         <label><input type="checkbox" id="sendH" checked> 高校生</label>&nbsp;&nbsp;&nbsp;&nbsp;
         <label><input type="checkbox" id="sendStaff" checked> 教職員（その他）</label>
+        <div style="margin-top:10px;">
+          <label style="display:block; font-size:13px; font-weight:bold; margin-bottom:5px;">教職員個別メール登録（名簿未解決時の救済）</label>
+          <textarea id="staffOverrides" style="height:80px;" placeholder="例: 山田太郎, yamada@example.com"></textarea>
+        </div>
       </div>
 
       <div class="grid-container no-print">
@@ -164,6 +168,7 @@
             <thead>
               <tr>
                 <th class="sortable" data-sort-key="status">判定</th>
+                <th class="sortable" data-sort-key="deliveryStatus">送信ステータス</th>
                 <th class="sortable" data-sort-key="category">区分</th>
                 <th class="sortable" data-sort-key="id">4桁ID</th>
                 <th class="sortable" data-sort-key="rosterName">名簿名</th>
@@ -207,6 +212,7 @@
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
         if(s.sendStaff !== undefined) document.getElementById('sendStaff').checked = String(s.sendStaff) === "true";
+        if(s.staffOverrides !== undefined) document.getElementById('staffOverrides').value = s.staffOverrides;
         
         if(s.subOverdue) document.getElementById('subOverdue').value = s.subOverdue;
         if(s.tplOverdue) document.getElementById('tplOverdue').value = s.tplOverdue;
@@ -485,6 +491,7 @@
           sendJ: document.getElementById('sendJ').checked,
           sendH: document.getElementById('sendH').checked,
           sendStaff: document.getElementById('sendStaff').checked,
+          staffOverrides: document.getElementById('staffOverrides').value,
           subOverdue: document.getElementById('subOverdue').value,
           tplOverdue: document.getElementById('tplOverdue').value,
           subReminder: document.getElementById('subReminder').value,
@@ -530,6 +537,7 @@
           let tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${r.status || ''}</td>
+            <td>${r.deliveryStatus || ''}</td>
             <td>${r.category || ''}</td>
             <td>${r.id || ''}</td>
             <td>${r.rosterName || ''}</td>

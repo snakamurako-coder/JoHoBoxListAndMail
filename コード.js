@@ -81,6 +81,22 @@ function getHeaderIndexMap(headers) {
   return map;
 }
 
+function parseStaffEmailOverrides(raw) {
+  const map = {};
+  const text = String(raw || "").trim();
+  if (!text) return map;
+  text.split(/\r?\n/).forEach(line => {
+    const row = String(line || "").trim();
+    if (!row) return;
+    const parts = row.split(",");
+    if (parts.length < 2) return;
+    const name = String(parts[0] || "").trim();
+    const email = String(parts[1] || "").trim();
+    if (name && email) map[name] = email;
+  });
+  return map;
+}
+
 function buildRosterContactMap(rosterConfig) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(rosterConfig.sheetName);
@@ -322,6 +338,7 @@ function selectRosterConfig(settings, recordDate) {
 function resolveRecordsWithContacts(records, settings) {
   const dateBase = settings.rosterDateBase === "dueDate" ? "dueDate" : "borrowDate";
   const rosterMaps = {};
+  const staffOverrides = parseStaffEmailOverrides(settings.staffOverrides);
   const resolved = [];
 
   records.forEach(r => {
@@ -333,6 +350,7 @@ function resolveRecordsWithContacts(records, settings) {
 
     let email = "";
     let resolvedName = "";
+    let contactSource = "none";
     if (selectedRoster) {
       const rosterKey = selectedRoster.name || selectedRoster.sheetName;
       if (!rosterMaps[rosterKey]) {
@@ -343,6 +361,17 @@ function resolveRecordsWithContacts(records, settings) {
       if (contact) {
         email = contact.email || "";
         resolvedName = contact.name || "";
+        contactSource = "roster";
+      }
+    }
+
+    // 名簿未解決の教職員は個別登録を適用
+    if (!email && category === "職員教職員") {
+      const overrideEmail = staffOverrides[r.name] || "";
+      if (overrideEmail) {
+        email = overrideEmail;
+        resolvedName = r.name;
+        contactSource = "staff_override";
       }
     }
 
@@ -352,6 +381,7 @@ function resolveRecordsWithContacts(records, settings) {
       rosterName: rosterName,
       resolvedName: resolvedName,
       email: email,
+      contactSource: contactSource,
       dateBase: dateBase,
       hasRoster: !!selectedRoster
     }));
@@ -377,6 +407,19 @@ function getScheduledPreview(payload) {
 
     const status = dueDate && dueDate < today ? "督促（期限超過）" : "予約（前日通知対象）";
     const recipientName = r.resolvedName || r.name;
+    let deliveryStatus = "";
+    if (!isAllowed) {
+      deliveryStatus = "送信対象外（区分オフ）";
+    } else if (!r.hasRoster && r.category !== "職員教職員") {
+      deliveryStatus = "送信不可（基準日に一致する名簿なし）";
+    } else if (!r.email) {
+      deliveryStatus = "送信不可（名簿に記載なし/メール未登録）";
+    } else if (r.contactSource === "staff_override") {
+      deliveryStatus = "送信可（教職員個別登録メール）";
+    } else {
+      deliveryStatus = "送信可";
+    }
+
     rows.push({
       id: r.id,
       category: r.category,
@@ -389,8 +432,9 @@ function getScheduledPreview(payload) {
       borrowDate: r.borrowDate,
       dueDate: r.dueDate,
       status: status,
+      deliveryStatus: deliveryStatus,
       isAllowed: isAllowed,
-      warning: !r.hasRoster ? "基準日に一致する名簿がありません" : (!r.email ? "メールアドレス未登録" : "")
+      warning: (!r.hasRoster && r.contactSource !== "staff_override") ? "基準日に一致する名簿がありません" : (!r.email ? "メールアドレス未登録" : "")
     });
   });
   return { rows: rows };
