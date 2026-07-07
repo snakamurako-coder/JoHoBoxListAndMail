@@ -12,111 +12,50 @@
       .flex-group { display: flex; gap: 15px; flex-wrap: wrap; }
       .form-item { flex: 1; min-width: 150px; }
       .form-item label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; }
-      .form-item input[type="text"], .form-item input[type="number"], .form-item input[type="date"], .form-item select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+      .form-item input[type="text"], .form-item input[type="number"] { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
       .grid-container { display: flex; gap: 20px; margin-bottom: 20px; }
       .template-box { flex: 1; display: flex; flex-direction: column; gap: 5px; }
       textarea { width: 100%; height: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; box-sizing: border-box; }
       .subject-input { padding: 6px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
-      
-      .btn { padding: 10px 18px; font-size: 14px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; transition: 0.2s;}
+      .btn { padding: 12px 20px; font-size: 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 4px; color: white; }
       .btn-primary { background-color: #3498db; }
       .btn-primary:hover { background-color: #2980b9; }
       .btn-success { background-color: #2ecc71; }
-      .btn-secondary { background-color: #7f8c8d; }
-      .btn-danger { background-color: #e74c3c; padding: 6px 10px; font-size: 12px;}
+      .btn-success:hover { background-color: #27ae60; }
       #syncStatus { font-size: 12px; color: #7f8c8d; float: right; margin-top: -30px; }
+      
       .vars-help { font-size:12px; color:#e67e22; margin-top:5px; font-weight:bold; }
-      
-      /* 詳細設定スタイル */
-      #advancedSettings { display: none; background: #fffdf7; border: 2px dashed #f39c12; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
-      .rule-card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 6px; position: relative; }
-      .rule-card h4 { margin: 0 0 10px 0; color: #d35400; }
-      .guide-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-size: 13px; color: #166534; margin-bottom: 15px; line-height: 1.5; }
-      
-      /* マトリクス表のスタイル */
-      .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; text-align: center; }
-      .matrix-table th, .matrix-table td { border: 1px solid #ddd; padding: 8px; }
-      .matrix-table th { background-color: #f39c12; color: white; font-weight: bold; }
-      .matrix-table td:first-child { font-weight: bold; background-color: #fafafa; text-align: left; width: 150px; }
-      .ok-mark { color: #2ecc71; font-weight: bold; font-size: 16px; }
-      .ng-mark { color: #e74c3c; font-weight: bold; font-size: 16px; }
-      
-      /* 印刷レイアウト */
-      .list-type-header { font-size: 20px; margin: 40px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid #ccc; }
-      .list-type-header:first-child { margin-top: 0; }
-      .nendo-section { margin-bottom: 30px; page-break-after: always; }
-      .class-section { margin-bottom: 20px; }
+      .vars-help span { color:#7f8c8d; font-weight:normal; }
+
+      /* --- 印刷およびプレビュー用レイアウト（2段組・改ページ） --- */
+      .class-section { margin-bottom: 30px; page-break-after: always; }
       .class-header { font-size: 18px; border-bottom: 2px solid #ccc; margin-bottom: 10px; padding-bottom: 5px; }
-      .nendo-title { font-size: 16px; margin: 0 0 15px 0; padding: 8px 12px; background: #f8f9fa; border-left: 4px solid #3498db; }
       .two-col-layout { display: flex; gap: 15px; align-items: flex-start; }
       .col-table { width: 50%; font-size: 13px; border-collapse: collapse; }
       .col-table th, .col-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
       .col-table th { background-color: #f2f6f8; }
-      .id-col { width: 50px; font-family: monospace; }
-      .name-col { width: 8em; overflow: hidden; text-overflow: ellipsis; }
+      .id-col { width: 50px; white-space: nowrap; font-family: monospace; }
+      .name-col { width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .date-col { width: 80px; white-space: nowrap; }
       
       .status-overdue { color: #c0392b; font-weight: bold; }
       .status-future { color: #27ae60; font-weight: bold; }
-      .staff-link { color: #2980b9; text-decoration: underline; cursor: pointer; }
-
-      /* 即時督促プレビュー */
-      .preview-section { margin-bottom: 35px; padding: 15px; background: #fff8f8; border: 1px solid #e8b4b4; border-radius: 6px; }
-      .preview-section h2 { font-size: 18px; color: #c0392b; margin: 0 0 10px 0; border-bottom: 2px solid #e8b4b4; padding-bottom: 8px; }
-      .preview-summary { font-size: 13px; color: #555; margin-bottom: 12px; }
-      .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      .preview-table th, .preview-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
-      .preview-table th { background: #f2dede; white-space: nowrap; }
-      .preview-table tr:nth-child(even) { background: #fdfafa; }
-      .preview-status-send { color: #27ae60; font-weight: bold; }
-      .preview-status-skip { color: #c0392b; font-weight: bold; }
-      .preview-status-off { color: #7f8c8d; }
-      .preview-name-diff { color: #d35400; font-weight: bold; }
-      .preview-controls { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin-bottom: 12px; font-size: 13px; }
-      .preview-filter-row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 8px; }
-      .preview-filter-row:last-child { margin-bottom: 0; }
-      .preview-filter-group { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
-      .preview-filter-group strong { color: #555; margin-right: 4px; }
-      .preview-filter-group label { cursor: pointer; white-space: nowrap; }
-      .preview-combine-toggle { display: inline-flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
-      .preview-combine-toggle label { padding: 4px 12px; margin: 0; background: #f5f5f5; cursor: pointer; font-size: 12px; }
-      .preview-combine-toggle label:has(input:checked) { background: #3498db; color: white; }
-      .preview-combine-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-      .preview-reset-btn { padding: 4px 10px; font-size: 12px; border: 1px solid #bbb; background: #fafafa; border-radius: 4px; cursor: pointer; }
-      .preview-reset-btn:hover { background: #eee; }
-      .preview-table th.sortable { cursor: pointer; user-select: none; }
-      .preview-table th.sortable:hover { background: #e8c4c4; }
-      .preview-table th .sort-ind { font-size: 10px; color: #888; margin-left: 3px; }
-      .preview-table th.sort-active .sort-ind { color: #c0392b; font-weight: bold; }
-      .preview-filtered-count { font-size: 12px; color: #7f8c8d; }
-
-      /* 印刷用フィルタ */
-      .print-filter-panel { margin-bottom: 20px; padding: 15px; background: #f0f7ff; border: 1px solid #aed0f0; border-radius: 6px; }
-      .print-filter-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #2c3e50; }
-      .print-filter-summary { font-size: 13px; color: #555; margin-bottom: 10px; }
-      .print-preset-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-      .print-preset-btn { padding: 5px 12px; font-size: 12px; border: 1px solid #3498db; background: white; color: #2980b9; border-radius: 4px; cursor: pointer; }
-      .print-preset-btn:hover { background: #ebf5fb; }
-      .print-filter-banner { display: none; font-size: 14px; font-weight: bold; margin-bottom: 15px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; }
 
       @media print {
         body * { visibility: hidden; }
         #printSection, #printSection * { visibility: visible; }
         #printSection { position: absolute; left: 0; top: 0; width: 100%; }
         .no-print { display: none !important; }
-        .nendo-section:last-child { page-break-after: auto; }
-        .list-type-header { page-break-before: always; }
-        .list-type-header:first-child { page-break-before: auto; }
+        .class-section:last-child { page-break-after: auto; }
         .col-table { font-size: 12px; }
         .col-table th, .col-table td { padding: 4px; }
-        .staff-link { text-decoration: none; color: inherit; }
-        .print-filter-banner { display: block !important; }
         @page { margin: 15mm; }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h2>図書室 督促システム V12.1 <span id="syncStatus">設定を読み込み中...</span></h2>
+      <h2>図書室 督促システム V7 <span id="syncStatus">設定を読み込み中...</span></h2>
       
       <div class="section no-print">
         <h3>1. 貸出中データ（xls, csv）の読み込み</h3>
@@ -124,9 +63,18 @@
       </div>
 
       <div class="section no-print">
-        <h3>2. 今回の送信対象（オン/オフ）</h3>
-        <label><input type="checkbox" id="sendH" checked> 高校生</label>&nbsp;&nbsp;&nbsp;&nbsp;
+        <h3>2. スプレッドシート名簿データの連携設定</h3>
+        <div class="flex-group">
+          <div class="form-item"><label>名簿シート名</label><input type="text" id="sheetName" value="連絡先"></div>
+          <div class="form-item"><label>4桁ID列番号 (例 Aなら1)</label><input type="number" id="idCol" value="1"></div>
+          <div class="form-item"><label>メール列番号 (例 Bなら2)</label><input type="number" id="emailCol" value="2"></div>
+        </div>
+      </div>
+
+      <div class="section no-print">
+        <h3>3. 今回の送信対象（オン/オフ）</h3>
         <label><input type="checkbox" id="sendJ" checked> 中学生</label>&nbsp;&nbsp;&nbsp;&nbsp;
+        <label><input type="checkbox" id="sendH" checked> 高校生</label>&nbsp;&nbsp;&nbsp;&nbsp;
         <label><input type="checkbox" id="sendStaff" checked> 教職員（その他）</label>
       </div>
 
@@ -138,7 +86,10 @@
             <input type="text" id="subOverdue" class="subject-input">
           </div>
           <textarea id="tplOverdue"></textarea>
-          <div class="vars-help">使用可能変数： 【氏名】 【クラス】 【書籍名】</div>
+          <div class="vars-help">
+            使用可能変数： 【氏名】 【クラス】 【書籍名】<br>
+            <span>※件名・本文どちらにも使用可能です。</span>
+          </div>
         </div>
         <div class="template-box">
           <h3>自動予約：予告メール（前日）</h3>
@@ -147,448 +98,39 @@
             <input type="text" id="subReminder" class="subject-input">
           </div>
           <textarea id="tplReminder"></textarea>
-          <div class="vars-help">使用可能変数： 【氏名】 【クラス】 【書籍名】</div>
+          <div class="vars-help">
+            使用可能変数： 【氏名】 【クラス】 【書籍名】<br>
+            <span>※件名に【書籍名】を含める場合、複数冊あるとスペース区切りで連結されます。</span>
+          </div>
         </div>
       </div>
 
-      <div style="margin-bottom: 20px;" class="no-print">
-        <button class="btn btn-primary" id="sendBtn" onclick="executeMails()" disabled style="margin-right: 15px; font-size: 16px; padding: 12px 24px;">一括処理を実行（即時督促 ＋ 予約更新）</button>
-        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled style="font-size: 16px; padding: 12px 24px;">絞り込んで印刷する</button>
-      </div>
-
-      <hr class="no-print" style="border:1px solid #eee; margin:30px 0;">
-      <button class="btn btn-secondary no-print" onclick="toggleAdvanced()" id="toggleBtn">⚙ 詳細設定を開く（名簿の登録・年度ルールの管理）</button>
-
-      <!-- 詳細設定エリア -->
-      <div id="advancedSettings" class="no-print">
-        
-        <div class="section" style="background:white; border-left: 4px solid #f39c12;">
-          <h3 style="color:#d35400; margin-top:0;">C. 現在の送信判定マトリクス（メイン画面の☑と連動）</h3>
-          <p style="font-size:12px; color:#7f8c8d; margin-top:0;">※各条件の期間に対応する名簿ルールが登録されていない区分は、☑がオンでも自動的に「×(未登録)」になります。</p>
-          <table class="matrix-table">
-            <thead>
-              <tr>
-                <th>年度区分</th>
-                <th>高校生</th>
-                <th>中学生</th>
-                <th>職員・教職員</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>今年度</td>
-                <td id="m_cur_H">-</td>
-                <td id="m_cur_J">-</td>
-                <td id="m_cur_S">-</td>
-              </tr>
-              <tr>
-                <td>昨年度</td>
-                <td id="m_prev_H">-</td>
-                <td id="m_prev_J">-</td>
-                <td id="m_prev_S">-</td>
-              </tr>
-              <tr>
-                <td>一昨年以前</td>
-                <td id="m_old_H">-</td>
-                <td id="m_old_J">-</td>
-                <td id="m_old_S">-</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="guide-box">
-          <strong>【名簿管理の手順と注意事項】</strong><br>
-          ① <strong>名簿の登録</strong>：Excel等から「学年・組・番号・メールアドレス」の表をコピーし、下の「A」欄に貼り付けてシートを作成します。<br>
-          ② <strong>ルールの紐付け</strong>：追加したシートを選び、どの列がIDやアドレスに該当するかを選択します。同じ見出し名（例:学年）が複数あっても、自動で列アルファベットが付与されるので正確に選べます。<br>
-          ③ <strong>照合方法</strong>：貸出日の名簿ルールは<strong>設定した期間（開始〜終了）を最優先</strong>で判定し、一致した名簿で<strong>学年・組・番号</strong>（4桁ID）をそのまま照合します。教職員は教職員名簿で照合します。<br>
-          ④ <strong>期間の微調整</strong>：4/1〜3/31固定でなくても問題ありません。学校運用（例：新年度通知日）に合わせて開始日・終了日を調整できます。<br>
-          ⑤ <strong>年度の自動補完</strong>：開始日を選択すると終了日は初期値として「翌年の3月31日」が入ります。必要に応じて手動で上書きしてください。
-        </div>
-        
-        <div class="section" style="background:white;">
-          <h3>A. 新しい名簿データを流し込んでシートを作成する</h3>
-          <textarea id="tsvInput" style="height: 60px;" placeholder="Excel等からコピーした名簿データをここに貼り付け（TSV形式）..."></textarea>
-          <div style="margin-top:10px; display:flex; gap:10px;">
-            <input type="text" id="newSheetName" placeholder="作成するシート名（例：連絡先_2026）" style="width:280px; padding:6px;">
-            <button class="btn btn-secondary" onclick="createSheet()">新規シートを作成</button>
-          </div>
-        </div>
-
-        <div class="section" style="background:white;">
-          <h3>B. 期間ごとの名簿適用ルール（複数登録・引き継ぎ可能）</h3>
-          <div id="rulesContainer"></div>
-
-          <div style="background:#fdfaf6; padding:15px; border:1px solid #f39c12; border-radius:6px; margin-top:15px;">
-            <h4 style="margin-top:0; color:#d35400;">✨ ルールの新規追加</h4>
-            <div class="flex-group" style="margin-bottom:10px;">
-              <div class="form-item">
-                <label>基準日</label>
-                <select id="ruleDateType">
-                  <option value="borrow">貸出日を基準にする</option>
-                  <option value="due">返却日を基準にする</option>
-                </select>
-              </div>
-              <div class="form-item"><label>期間の開始</label><input type="date" id="ruleStart"></div>
-              <div class="form-item"><label>期間の終了</label><input type="date" id="ruleEnd"></div>
-              <div class="form-item">
-                <label>適用する名簿シート</label>
-                <select id="ruleSheetSelect"><option value="">選択してください</option></select>
-              </div>
-            </div>
-            
-            <p style="font-size:12px; font-weight:bold; color:#d35400; margin-bottom:5px;">▼ 選択した名簿シートの列情報紐付け（実際のシート見出しから選択）</p>
-            <div class="flex-group">
-              <div class="form-item"><label>4桁ID列（あれば最優先）</label><select id="ruleIdCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>学年列（IDが無い場合必須）</label><select id="ruleGradeCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>組列（IDが無い場合必須）</label><select id="ruleClassCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>番号列（IDが無い場合必須）</label><select id="ruleNumCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>氏名列（任意・プレビュー表示用）</label><select id="ruleNameCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>メール列（必須）</label><select id="ruleEmailCol"><option value="">-- シートを選択してください --</option></select></div>
-            </div>
-            
-            <div id="ruleExplanation" style="margin-top:15px;"></div>
-            <div id="ruleEditStatus" style="margin-top:10px; font-size:12px; color:#d35400;"></div>
-            <button class="btn btn-primary" style="margin-top:15px; background-color:#e67e22;" onclick="addRule()">このルールを追加</button>
-            <button class="btn btn-secondary" id="cancelRuleEditBtn" style="margin-top:15px; margin-left:8px; display:none;" onclick="cancelRuleEdit()">編集をキャンセル</button>
-          </div>
-        </div>
+      <div style="margin-bottom: 30px;" class="no-print">
+        <button class="btn btn-primary" id="sendBtn" onclick="executeMails()" disabled style="margin-right: 15px;">一括処理を実行（即時督促 ＋ 予約更新）</button>
+        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled>クラス別・2段組リストを印刷する</button>
+        <span id="loader" style="display:none; margin-left:15px; font-weight:bold; color:#3498db;">処理中...</span>
       </div>
 
       <div id="printSection">
-        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むと、プレビューと印刷用リスト（年度・区分で絞り込み可）が生成されます</div>
+        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むとここにクラス別の印刷プレビューが生成されます</div>
       </div>
     </div>
 
     <script>
       let parsedRecords = [];
-      let systemRules = []; 
-      let sheetList = [];
-      let editingRuleIndex = -1;
-      let overduePreviewRows = [];
-      let previewViewState = {
-        sortCol: 'borrowDate',
-        sortDir: -1,
-        statuses: ['送信予定', '送信不可', '対象外'],
-        categories: ['中学', '高校', '職員'],
-        combineMode: 'and'
-      };
-      let printOverdueRecords = [];
-      let printFutureRecords = [];
-      let printAvailableNendos = [];
-      let printViewState = {
-        nendos: [],
-        categories: ['中学', '高校', '職員'],
-        combineMode: 'and'
-      };
-
-      function toggleAdvanced() {
-        const div = document.getElementById('advancedSettings');
-        const btn = document.getElementById('toggleBtn');
-        if (div.style.display === 'none' || div.style.display === '') {
-          div.style.display = 'block';
-          btn.innerText = '⚙ 詳細設定を閉じる';
-          fetchSheetList(); 
-        } else {
-          div.style.display = 'none';
-          btn.innerText = '⚙ 詳細設定を開く（名簿の登録・年度ルールの管理）';
-        }
-      }
-
-      function fetchSheetList(callback) {
-        google.script.run.withSuccessHandler(function(list) {
-          sheetList = list;
-          let select = document.getElementById('ruleSheetSelect');
-          select.innerHTML = '<option value="">-- シートを選択 --</option>';
-          list.forEach(name => {
-            let opt = document.createElement('option');
-            opt.value = name; opt.innerText = name;
-            select.appendChild(opt);
-          });
-          if (callback) callback();
-        }).getSpreadsheetSheets();
-      }
-
-      function loadRuleColumns(sheetName, selectedRule) {
-        if (!sheetName) return;
-        const ids = ['ruleIdCol', 'ruleGradeCol', 'ruleClassCol', 'ruleNumCol', 'ruleNameCol', 'ruleEmailCol'];
-        ids.forEach(id => document.getElementById(id).innerHTML = '<option value="">読込中...</option>');
-        
-        google.script.run.withSuccessHandler(function(headers) {
-          ids.forEach(id => {
-            let el = document.getElementById(id);
-            el.innerHTML = id === 'ruleEmailCol' ? '<option value="">-- 選択必須 --</option>' : '<option value="">-- 指定なし --</option>';
-            headers.forEach(h => {
-              let opt = document.createElement('option');
-              opt.value = h.index; opt.innerText = h.text;
-              el.appendChild(opt);
-            });
-          });
-          if (selectedRule) {
-            document.getElementById('ruleIdCol').value = selectedRule.idCol || "";
-            document.getElementById('ruleGradeCol').value = selectedRule.gradeCol || "";
-            document.getElementById('ruleClassCol').value = selectedRule.classCol || "";
-            document.getElementById('ruleNumCol').value = selectedRule.numCol || "";
-            document.getElementById('ruleNameCol').value = selectedRule.nameCol || "";
-            document.getElementById('ruleEmailCol').value = selectedRule.emailCol || "";
-          }
-          updateRuleExplanation();
-        }).getSheetHeaders(sheetName);
-      }
-
-      document.getElementById('ruleSheetSelect').addEventListener('change', function(e) {
-        let sheetName = e.target.value;
-        loadRuleColumns(sheetName, null);
-      });
-
-      document.getElementById('ruleStart').addEventListener('input', function(e) {
-        let val = e.target.value;
-        if (!val) return;
-        let parts = val.split('-');
-        if (parts.length === 3) {
-          let year = parseInt(parts[0], 10);
-          document.getElementById('ruleEnd').value = `${year + 1}-03-31`;
-          updateRuleExplanation();
-        }
-      });
-
-      ['ruleDateType', 'ruleEnd', 'ruleSheetSelect'].forEach(id => {
-        document.getElementById(id).addEventListener('change', updateRuleExplanation);
-      });
-
-      ['sendH', 'sendJ', 'sendStaff'].forEach(id => {
-        document.getElementById(id).addEventListener('change', function() {
-          updateMatrixTable();
-          refreshOverduePreview();
-        });
-      });
-
-      function updateMatrixTable() {
-        let chkH = document.getElementById('sendH').checked;
-        let chkJ = document.getElementById('sendJ').checked;
-        let chkStaff = document.getElementById('sendStaff').checked;
-
-        let curYear = new Date().getFullYear();
-        let curStart = new Date(`${curYear}/04/01`).getTime();
-        let curEnd = new Date(`${curYear + 1}/03/31`).getTime();
-        let prevStart = new Date(`${curYear - 1}/04/01`).getTime();
-        let prevEnd = new Date(`${curYear}/03/31`).getTime();
-
-        let hasCurRule = systemRules.some(r => { let s = new Date(r.start).getTime(); return s >= curStart && s <= curEnd; });
-        let hasPrevRule = systemRules.some(r => { let s = new Date(r.start).getTime(); return s >= prevStart && s <= prevEnd; });
-        let hasOldRule = systemRules.some(r => { let s = new Date(r.start).getTime(); return s < prevStart; });
-
-        let mark = (chk, hasRule) => {
-          if (!chk) return '<span class="ng-mark">×</span>';
-          if (!hasRule) return '<span class="ng-mark">×<span style="font-size:10px;font-weight:normal;color:#7f8c8d;"><br>(名簿未登録)</span></span>';
-          return '<span class="ok-mark">○</span>';
-        };
-
-        document.getElementById('m_cur_H').innerHTML = mark(chkH, hasCurRule);
-        document.getElementById('m_cur_J').innerHTML = mark(chkJ, hasCurRule);
-        document.getElementById('m_cur_S').innerHTML = chkStaff ? '<span class="ok-mark">○</span>' : '<span class="ng-mark">×</span>';
-
-        document.getElementById('m_prev_H').innerHTML = mark(chkH, hasPrevRule);
-        document.getElementById('m_prev_J').innerHTML = mark(chkJ, hasPrevRule);
-        document.getElementById('m_prev_S').innerHTML = chkStaff ? '<span class="ok-mark">○</span>' : '<span class="ng-mark">×</span>';
-
-        document.getElementById('m_old_H').innerHTML = mark(chkH, hasOldRule);
-        document.getElementById('m_old_J').innerHTML = mark(chkJ, hasOldRule);
-        document.getElementById('m_old_S').innerHTML = chkStaff ? '<span class="ok-mark">○</span>' : '<span class="ng-mark">×</span>';
-      }
-
-      function updateRuleExplanation() {
-        let dateType = document.getElementById('ruleDateType').value;
-        let startVal = document.getElementById('ruleStart').value;
-        let endVal = document.getElementById('ruleEnd').value;
-        let sheetName = document.getElementById('ruleSheetSelect').value;
-        
-        let expDiv = document.getElementById('ruleExplanation');
-        if (!startVal || !endVal || !sheetName) {
-          expDiv.innerHTML = "<span style='color:#7f8c8d; font-size:12px;'>※期間と名簿シートを選択すると、ここにルールの適用シミュレーション文章が自動生成されます。</span>";
-          return;
-        }
-        
-        let dateLbl = dateType === 'due' ? '返却日' : '貸出日';
-        let actionLbl = dateType === 'due' ? '返却期限の' : '貸し出された';
-        
-        let startDate = new Date(startVal);
-        let prevDate = new Date(startDate);
-        prevDate.setDate(prevDate.getDate() - 1);
-        let prevDateStr = prevDate.getFullYear() + '/' + ('0' + (prevDate.getMonth() + 1)).slice(-2) + '/' + ('0' + prevDate.getDate()).slice(-2);
-        
-        let startStr = startVal.replace(/-/g, '/');
-        let endStr = endVal.replace(/-/g, '/');
-        
-        let prevSheet = "";
-        for (let i = 0; i < systemRules.length; i++) {
-          let r = systemRules[i];
-          if (r.dateType === dateType) {
-            let rStart = new Date(r.start); let rEnd = new Date(r.end);
-            if (prevDate >= rStart && prevDate <= rEnd) { prevSheet = r.sheetName; break; }
-          }
-        }
-        
-        let text = "";
-        if (prevSheet) {
-          text = `① ${dateLbl}が <strong>${prevDateStr}</strong> の場合、すでに登録されているルールに基づき、<strong>「${prevSheet}」</strong>に登録されている内容で処理が行われます。<br>`;
-        } else {
-          text = `① ${dateLbl}が <strong>${prevDateStr}</strong> の場合、対応の名簿（ルール）が存在しないため、生徒に対しての督促・予約処理は行われません。<br>`;
-        }
-        
-        text += `② ${dateLbl}が <strong>${startStr} から ${endStr}</strong> までは、名簿<strong>「${sheetName}」</strong>が使用されます。<br>`;
-        
-        let nextDate = new Date(endVal);
-        nextDate.setDate(nextDate.getDate() + 1);
-        let nextDateStr = nextDate.getFullYear() + '/' + ('0' + (nextDate.getMonth() + 1)).slice(-2) + '/' + ('0' + nextDate.getDate()).slice(-2);
-
-        // 追加しようとしているルールの終了日以降に続くルールがあるか確認
-        let nextRule = null;
-        for (let i = 0; i < systemRules.length; i++) {
-          let r = systemRules[i];
-          if (r.dateType !== dateType) continue;
-          let rStart = new Date(r.start);
-          if (rStart.getTime() >= nextDate.getTime()) {
-            if (!nextRule || rStart.getTime() < new Date(nextRule.start).getTime()) {
-              nextRule = r;
-            }
-          }
-        }
-
-        if (nextRule) {
-          let nrStart = String(nextRule.start || "").replace(/-/g, '/');
-          let nrEnd = String(nextRule.end || "").replace(/-/g, '/');
-          text += `③ ${dateLbl}が <strong>${nrStart} から ${nrEnd}</strong> までは、名簿<strong>「${nextRule.sheetName}」</strong>が使用されます。<br>`;
-
-          let nextAfterNext = new Date(nextRule.end);
-          nextAfterNext.setDate(nextAfterNext.getDate() + 1);
-          let nextAfterNextStr = nextAfterNext.getFullYear() + '/' + ('0' + (nextAfterNext.getMonth() + 1)).slice(-2) + '/' + ('0' + nextAfterNext.getDate()).slice(-2);
-          text += `④ <strong>${nextAfterNextStr}</strong> 以降に${actionLbl}書籍に関しては、新しい引き継ぎルールが登録されるまで、有効な名簿はありません。`;
-        } else {
-          text += `③ <strong>${nextDateStr}</strong> 以降に${actionLbl}書籍に関しては、新しい引き継ぎルールが登録されるまで、有効な名簿はありません。`;
-        }
-        
-        expDiv.innerHTML = `<div style="background:#fff7ed; border:1px solid #f97316; padding:12px; border-radius:6px; font-size:13px; line-height:1.6; color:#c2410c;"><strong>【新ルールの適用シミュレーション】</strong><br>${text}</div>`;
-      }
-
-      function createSheet() {
-        let name = document.getElementById('newSheetName').value.trim();
-        let tsv = document.getElementById('tsvInput').value;
-        if(!name || !tsv) return alert('シート名とデータを入力してください。');
-        google.script.run.withSuccessHandler(msg => {
-          alert(msg); document.getElementById('newSheetName').value = ''; document.getElementById('tsvInput').value = ''; fetchSheetList();
-        }).withFailureHandler(err => alert("エラー: " + err.message)).createSheetFromTSV(name, tsv);
-      }
-
-      function setRuleEditMode(index) {
-        editingRuleIndex = index;
-        const addBtn = document.querySelector('button[onclick="addRule()"]');
-        const cancelBtn = document.getElementById('cancelRuleEditBtn');
-        const status = document.getElementById('ruleEditStatus');
-        if (index >= 0) {
-          addBtn.innerText = 'このルールを上書き保存';
-          cancelBtn.style.display = 'inline-block';
-          status.innerText = `ルール ${index + 1} を編集中です（保存すると上書きされます）。`;
-        } else {
-          addBtn.innerText = 'このルールを追加';
-          cancelBtn.style.display = 'none';
-          status.innerText = '';
-        }
-      }
-
-      function loadRuleToForm(index) {
-        const rule = systemRules[index];
-        if (!rule) return;
-        setRuleEditMode(index);
-        document.getElementById('ruleDateType').value = rule.dateType || 'borrow';
-        document.getElementById('ruleStart').value = String(rule.start || "").replace(/\//g, '-');
-        document.getElementById('ruleEnd').value = String(rule.end || "").replace(/\//g, '-');
-        const apply = function() {
-          document.getElementById('ruleSheetSelect').value = rule.sheetName || "";
-          loadRuleColumns(rule.sheetName, rule);
-        };
-        if (!sheetList || sheetList.length === 0) fetchSheetList(apply);
-        else apply();
-        updateRuleExplanation();
-      }
-
-      function cancelRuleEdit() {
-        setRuleEditMode(-1);
-      }
-
-      function renderRules() {
-        let container = document.getElementById('rulesContainer'); container.innerHTML = '';
-        if (systemRules.length === 0) {
-          container.innerHTML = '<p style="font-size:13px; color:#c0392b;">現在、適用ルールは登録されていません。下から追加してください。</p>'; 
-          updateMatrixTable();
-          refreshOverduePreview();
-          return;
-        }
-        systemRules.forEach((r, index) => {
-          let card = document.createElement('div'); card.className = 'rule-card';
-          card.innerHTML = `
-            <button class="btn-danger" style="position:absolute; right:15px; top:15px;" onclick="deleteRule(${index})">削除</button>
-            <button class="btn btn-secondary" style="position:absolute; right:75px; top:15px; padding:6px 10px; font-size:12px;" onclick="loadRuleToForm(${index})">編集</button>
-            <h4>ルール ${index + 1}: ${r.sheetName}</h4>
-            <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> 貸出日が ${r.start} ～ ${r.end} の期間に入る貸出に適用</p>
-          `;
-          container.appendChild(card);
-        });
-        updateMatrixTable();
-        refreshOverduePreview();
-      }
-
-      function addRule() {
-        let rule = {
-          dateType: document.getElementById('ruleDateType').value,
-          start: document.getElementById('ruleStart').value.replace(/-/g, '/'),
-          end: document.getElementById('ruleEnd').value.replace(/-/g, '/'),
-          sheetName: document.getElementById('ruleSheetSelect').value,
-          idCol: document.getElementById('ruleIdCol').value,
-          gradeCol: document.getElementById('ruleGradeCol').value,
-          classCol: document.getElementById('ruleClassCol').value,
-          numCol: document.getElementById('ruleNumCol').value,
-          nameCol: document.getElementById('ruleNameCol').value,
-          emailCol: document.getElementById('ruleEmailCol').value
-        };
-
-        if(!rule.start || !rule.end || !rule.sheetName || !rule.emailCol) return alert("「期間」「対象シート」「メール列」は必須です。");
-        if(!rule.idCol && (!rule.gradeCol || !rule.classCol || !rule.numCol)) return alert("照合のため「4桁ID列」か、または「学年・組・番号の全3列」のどちらかを選択してください。");
-        let newStart = new Date(rule.start).getTime();
-        let newEnd = new Date(rule.end).getTime();
-        let overlap = systemRules.find(r => {
-          if (editingRuleIndex >= 0 && systemRules[editingRuleIndex] === r) return false;
-          if ((r.dateType || 'borrow') !== (rule.dateType || 'borrow')) return false;
-          let s = new Date(r.start).getTime();
-          let e = new Date(r.end).getTime();
-          return !(newEnd < s || e < newStart);
-        });
-        if (overlap) {
-          let lbl = (rule.dateType || 'borrow') === 'due' ? '返却日基準' : '貸出日基準';
-          return alert(`期間が重複しています（${lbl}）。\n重複先: ${overlap.sheetName} (${overlap.start} ～ ${overlap.end})\n期間が重ならないように設定してください。`);
-        }
-
-        if (editingRuleIndex >= 0) systemRules[editingRuleIndex] = rule;
-        else systemRules.push(rule);
-        localStorage.setItem('v11_rules', JSON.stringify(systemRules));
-        renderRules(); updateRuleExplanation();
-        alert(editingRuleIndex >= 0 ? 'ルールを上書きしました。画面中央の「一括処理を実行」ボタンを押すと完全に保存されます。' : 'ルールを追加しました。画面中央の「一括処理を実行」ボタンを押すと完全に保存されます。');
-        setRuleEditMode(-1);
-      }
-
-      function deleteRule(idx) {
-        if(!confirm('このルールを削除しますか？')) return;
-        systemRules.splice(idx, 1);
-        if (editingRuleIndex === idx) setRuleEditMode(-1);
-        else if (editingRuleIndex > idx) setRuleEditMode(editingRuleIndex - 1);
-        localStorage.setItem('v11_rules', JSON.stringify(systemRules));
-        renderRules(); updateRuleExplanation();
-      }
+      const defSubOverdue = "【図書室】未返却図書のお知らせ";
+      const defTplOverdue = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書が返却期限を過ぎております。\n\n【書籍名】\n\n速やかにご返却ください。";
+      const defSubReminder = "【図書室】返却期限間近のお知らせ";
+      const defTplReminder = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
 
       function applySettings(s) {
+        if(s.sheetName) document.getElementById('sheetName').value = s.sheetName;
+        if(s.idCol) document.getElementById('idCol').value = s.idCol;
+        if(s.emailCol) document.getElementById('emailCol').value = s.emailCol;
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
         if(s.sendStaff !== undefined) document.getElementById('sendStaff').checked = String(s.sendStaff) === "true";
+        
         if(s.subOverdue) document.getElementById('subOverdue').value = s.subOverdue;
         if(s.tplOverdue) document.getElementById('tplOverdue').value = s.tplOverdue;
         if(s.subReminder) document.getElementById('subReminder').value = s.subReminder;
@@ -596,28 +138,31 @@
       }
 
       window.onload = function() {
-        let localSettings = localStorage.getItem('v11_settings');
-        if (localSettings) applySettings(JSON.parse(localSettings));
-        
-        let localRules = localStorage.getItem('v11_rules');
-        if (localRules) { systemRules = JSON.parse(localRules); renderRules(); }
+        let localSettings = localStorage.getItem('v7_settings');
+        if (localSettings) {
+          applySettings(JSON.parse(localSettings));
+          document.getElementById('syncStatus').innerText = "クラウド設定と同期中...";
+        } else {
+          document.getElementById('subOverdue').value = defSubOverdue;
+          document.getElementById('tplOverdue').value = defTplOverdue;
+          document.getElementById('subReminder').value = defSubReminder;
+          document.getElementById('tplReminder').value = defTplReminder;
+        }
 
-        let currentYear = new Date().getFullYear();
-        document.getElementById('ruleStart').value = `${currentYear}-04-01`;
-        document.getElementById('ruleEnd').value = `${currentYear + 1}-03-31`;
-
-        google.script.run.withSuccessHandler(function(cloudData) {}).loadSettings();
-        google.script.run.withSuccessHandler(function(rules) {
-          if(rules && rules.length > 0) {
-            systemRules = rules; localStorage.setItem('v11_rules', JSON.stringify(rules)); renderRules();
-          }
-          updateMatrixTable();
-          if (parsedRecords.length > 0) refreshOverduePreview();
-        }).loadRules();
+        google.script.run
+          .withSuccessHandler(function(cloudSettings) {
+            if (cloudSettings) {
+              applySettings(cloudSettings);
+              localStorage.setItem('v7_settings', JSON.stringify(cloudSettings));
+            }
+            document.getElementById('syncStatus').innerText = "✓ 設定同期完了";
+          })
+          .loadSettings();
       };
 
       document.getElementById('fileInput').addEventListener('change', function(e) {
-        var file = e.target.files[0]; if (!file) return;
+        var file = e.target.files[0];
+        if (!file) return;
         var reader = new FileReader();
         reader.onload = function(e) {
           var data = new Uint8Array(e.target.result);
@@ -630,12 +175,17 @@
                let row1 = json[i];
                if(row1[0] && String(row1[0]).match(/^\d+$/) && i + 1 < json.length) {
                  let row2 = json[i+1];
+                 let name = String(row1[4] || "").trim();
+                 let classInfo = String(row2[3] || "").trim();
+                 
                  let formatD = (d) => {
-                   if (!d) return ""; let dateObj = new Date(d);
+                   if (!d) return "";
+                   let dateObj = new Date(d);
                    return isNaN(dateObj) ? d : `${dateObj.getFullYear()}/${('0'+(dateObj.getMonth()+1)).slice(-2)}/${('0'+dateObj.getDate()).slice(-2)}`;
                  };
+
                  parsedRecords.push({
-                   title: row1[1], name: String(row1[4]||"").trim(), classInfo: String(row2[3]||"").trim(),
+                   title: row1[1], name: name, classInfo: classInfo,
                    borrowDate: formatD(row1[5]), dueDate: formatD(row2[5])
                  });
                  i++;
@@ -643,313 +193,18 @@
             }
           });
           
-          parsedRecords.forEach(r => { 
-            r.generatedId = normalizeId(r.classInfo, r.name); 
-            r.sortKey = getSortKey(r.classInfo, r.generatedId); 
-            
-            // ★年度(nendo)の計算をプロパティに追加
-            if (!r.borrowDate) {
-              r.nendo = "不明";
-            } else {
-              let parts = r.borrowDate.split('/');
-              if (parts.length >= 2) {
-                let y = parseInt(parts[0], 10);
-                let m = parseInt(parts[1], 10);
-                r.nendo = (m <= 3) ? y - 1 : y;
-              } else {
-                r.nendo = "不明";
-              }
-            }
+          parsedRecords.forEach(r => {
+            r.generatedId = normalizeId(r.classInfo, r.name);
+            r.sortKey = getSortKey(r.classInfo, r.generatedId);
           });
-          
           parsedRecords.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
           renderPrintLayout();
-          document.getElementById('sendBtn').disabled = false; document.getElementById('printBtn').disabled = false;
+          document.getElementById('sendBtn').disabled = false;
+          document.getElementById('printBtn').disabled = false;
         };
         reader.readAsArrayBuffer(file);
       });
-
-      function getCurrentSettings() {
-        return {
-          sendJ: document.getElementById('sendJ').checked,
-          sendH: document.getElementById('sendH').checked,
-          sendStaff: document.getElementById('sendStaff').checked,
-          subOverdue: document.getElementById('subOverdue').value,
-          tplOverdue: document.getElementById('tplOverdue').value,
-          subReminder: document.getElementById('subReminder').value,
-          tplReminder: document.getElementById('tplReminder').value
-        };
-      }
-
-      function escapeHtml(str) {
-        return String(str || "").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      }
-
-      function escapeJsStr(str) {
-        return String(str || "").replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      }
-
-      function refreshOverduePreview() {
-        const previewEl = document.getElementById('overduePreviewSection');
-        if (!previewEl || parsedRecords.length === 0) return;
-
-        previewEl.innerHTML = '<p style="color:#7f8c8d; font-size:13px;">即時督促プレビューを読み込み中...</p>';
-
-        if (systemRules.length === 0) {
-          previewEl.innerHTML = `
-            <div class="preview-section">
-              <h2>即時督促メール送信プレビュー</h2>
-              <p style="color:#c0392b; font-size:13px;">詳細設定から名簿ルールを1つ以上登録すると、送信対象のプレビューが表示されます。</p>
-            </div>`;
-          return;
-        }
-
-        let payload = { records: parsedRecords, settings: getCurrentSettings(), rules: systemRules };
-        google.script.run
-          .withSuccessHandler(renderOverduePreview)
-          .withFailureHandler(function(err) {
-            previewEl.innerHTML = `<div class="preview-section"><p style="color:#c0392b;">プレビュー取得エラー: ${escapeHtml(err.message)}</p></div>`;
-          })
-          .previewOverdueMails(payload);
-      }
-
-      function getPreviewCategory(r) {
-        if (r.isStaff) return '職員';
-        if (r.classInfo && r.classInfo.includes('高校')) return '高校';
-        if (r.classInfo && r.classInfo.includes('中学')) return '中学';
-        return 'その他';
-      }
-
-      function parsePreviewDate(str) {
-        if (!str) return 0;
-        let p = String(str).split('/');
-        if (p.length < 3) return 0;
-        return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)).getTime();
-      }
-
-      function getPreviewSortValue(row, col) {
-        switch (col) {
-          case 'status':
-            return ({ '送信予定': '0', '送信不可': '1', '対象外': '2' }[row.status] || '9') + (row.statusDetail || '');
-          case 'matchId': return row.matchId || '';
-          case 'rosterName': return row.rosterName || '';
-          case 'borrowName': return row.borrowName || '';
-          case 'classInfo': return row.classInfo || '';
-          case 'title': return row.title || '';
-          case 'borrowDate': return parsePreviewDate(row.borrowDate);
-          case 'dueDate': return parsePreviewDate(row.dueDate);
-          case 'nendo':
-            return row.nendo === '不明' ? -1 : (parseInt(row.nendo, 10) || 0);
-          case 'rosterSheet': return row.rosterSheet || '';
-          case 'rosterNendo': return row.rosterNendo || '';
-          case 'email': return row.email || '';
-          case 'category': return getPreviewCategory(row);
-          default: return '';
-        }
-      }
-
-      function comparePreviewRows(a, b, col, dir) {
-        let va = getPreviewSortValue(a, col);
-        let vb = getPreviewSortValue(b, col);
-        let cmp = 0;
-        if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
-        else cmp = String(va).localeCompare(String(vb), 'ja');
-        return cmp * dir;
-      }
-
-      function getFilteredPreviewRows() {
-        const s = previewViewState;
-        const statusActive = s.statuses.length > 0;
-        const catActive = s.categories.length > 0;
-
-        return overduePreviewRows.filter(row => {
-          const matchStatus = s.statuses.includes(row.status);
-          const matchCat = s.categories.includes(getPreviewCategory(row));
-
-          if (!statusActive && !catActive) return true;
-          if (s.combineMode === 'and') {
-            if (statusActive && catActive) return matchStatus && matchCat;
-            if (statusActive) return matchStatus;
-            return matchCat;
-          }
-          return (statusActive && matchStatus) || (catActive && matchCat);
-        });
-      }
-
-      function getSortedPreviewRows(rows) {
-        const col = previewViewState.sortCol;
-        const dir = previewViewState.sortDir;
-        return rows.slice().sort((a, b) => comparePreviewRows(a, b, col, dir));
-      }
-
-      function readPreviewFilterStateFromDom() {
-        const statusEls = document.querySelectorAll('.pf-status:checked');
-        const catEls = document.querySelectorAll('.pf-cat:checked');
-        previewViewState.statuses = Array.from(statusEls).map(el => el.value);
-        previewViewState.categories = Array.from(catEls).map(el => el.value);
-        const combineEl = document.querySelector('input[name="pf-combine"]:checked');
-        if (combineEl) previewViewState.combineMode = combineEl.value;
-      }
-
-      function onPreviewFilterChange() {
-        readPreviewFilterStateFromDom();
-        paintOverduePreview();
-      }
-
-      function onPreviewSort(col) {
-        if (previewViewState.sortCol === col) {
-          previewViewState.sortDir *= -1;
-        } else {
-          previewViewState.sortCol = col;
-          previewViewState.sortDir = 1;
-        }
-        paintOverduePreview();
-      }
-
-      function resetPreviewFilters() {
-        previewViewState.statuses = ['送信予定', '送信不可', '対象外'];
-        previewViewState.categories = ['中学', '高校', '職員'];
-        previewViewState.combineMode = 'and';
-        previewViewState.sortCol = 'borrowDate';
-        previewViewState.sortDir = -1;
-        paintOverduePreview();
-      }
-
-      function renderOverduePreview(rows) {
-        overduePreviewRows = rows || [];
-        paintOverduePreview();
-      }
-
-      function paintOverduePreview() {
-        const previewEl = document.getElementById('overduePreviewSection');
-        if (!previewEl) return;
-
-        const allRows = overduePreviewRows;
-        const filteredRows = getSortedPreviewRows(getFilteredPreviewRows());
-
-        let sendCount = allRows.filter(r => r.willSend).length;
-        let skipCount = allRows.filter(r => r.status === '送信不可').length;
-        let offCount = allRows.filter(r => r.status === '対象外').length;
-        const s = previewViewState;
-
-        let html = `
-          <div class="preview-section">
-            <h2>即時督促メール送信プレビュー</h2>
-            <div class="preview-summary">
-              期限超過 ${allRows.length}件 —
-              <span class="preview-status-send">送信予定 ${sendCount}件</span> /
-              <span class="preview-status-skip">送信不可 ${skipCount}件</span> /
-              <span class="preview-status-off">対象外 ${offCount}件</span>
-              <span class="preview-filtered-count">　｜　表示 ${filteredRows.length}件</span>
-              <span style="font-size:11px; color:#7f8c8d; margin-left:8px;">（この一覧は印刷されません）</span>
-            </div>`;
-
-        if (allRows.length === 0) {
-          html += '<p style="color:#7f8c8d; font-size:13px;">現在、即時督促の対象となる期限超過データはありません。</p></div>';
-          previewEl.innerHTML = html;
-          return;
-        }
-
-        html += `
-          <div class="preview-controls">
-            <div class="preview-filter-row">
-              <div class="preview-filter-group">
-                <strong>ステータス</strong>
-                <label><input type="checkbox" class="pf-status" value="送信予定" ${s.statuses.includes('送信予定') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 送信予定</label>
-                <label><input type="checkbox" class="pf-status" value="送信不可" ${s.statuses.includes('送信不可') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 送信不可</label>
-                <label><input type="checkbox" class="pf-status" value="対象外" ${s.statuses.includes('対象外') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 対象外</label>
-              </div>
-            </div>
-            <div class="preview-filter-row">
-              <div class="preview-filter-group">
-                <strong>区分</strong>
-                <label><input type="checkbox" class="pf-cat" value="中学" ${s.categories.includes('中学') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 中学生</label>
-                <label><input type="checkbox" class="pf-cat" value="高校" ${s.categories.includes('高校') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 高校生</label>
-                <label><input type="checkbox" class="pf-cat" value="職員" ${s.categories.includes('職員') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 職員・教職員</label>
-              </div>
-              <div class="preview-filter-group">
-                <strong>条件の結合</strong>
-                <div class="preview-combine-toggle">
-                  <label><input type="radio" name="pf-combine" value="and" ${s.combineMode === 'and' ? 'checked' : ''} onchange="onPreviewFilterChange()">AND</label>
-                  <label><input type="radio" name="pf-combine" value="or" ${s.combineMode === 'or' ? 'checked' : ''} onchange="onPreviewFilterChange()">OR</label>
-                </div>
-                <span style="font-size:11px; color:#7f8c8d;">（ステータス条件と区分条件の結合方法）</span>
-              </div>
-              <button type="button" class="preview-reset-btn" onclick="resetPreviewFilters()">フィルタ・並び順をリセット</button>
-            </div>
-          </div>`;
-
-        const cols = [
-          { key: 'status', label: 'ステータス' },
-          { key: 'category', label: '区分' },
-          { key: 'matchId', label: '照合ID（学年・組・番）' },
-          { key: 'rosterName', label: '名簿氏名' },
-          { key: 'borrowName', label: '貸出データ氏名' },
-          { key: 'classInfo', label: 'クラス' },
-          { key: 'title', label: '書籍名' },
-          { key: 'borrowDate', label: '貸出日' },
-          { key: 'dueDate', label: '返却期限' },
-          { key: 'nendo', label: '貸出年度' },
-          { key: 'rosterNendo', label: '参照名簿年度' },
-          { key: 'rosterSheet', label: '参照名簿' },
-          { key: 'email', label: 'メール' }
-        ];
-
-        html += '<div style="overflow-x:auto;"><table class="preview-table"><thead><tr>';
-        cols.forEach(c => {
-          let active = s.sortCol === c.key ? ' sort-active' : '';
-          let ind = s.sortCol === c.key ? (s.sortDir > 0 ? '▲' : '▼') : '⇅';
-          html += `<th class="sortable${active}" onclick="onPreviewSort('${c.key}')">${c.label}<span class="sort-ind">${ind}</span></th>`;
-        });
-        html += '</tr></thead><tbody>';
-
-        if (filteredRows.length === 0) {
-          html += '<tr><td colspan="13" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
-        } else {
-          filteredRows.forEach(r => {
-            let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
-            let statusText = r.statusDetail ? `${r.status}（${r.statusDetail}）` : r.status;
-            let cat = getPreviewCategory(r);
-
-            let matchIdHtml = r.isStaff ? 'STAFF' : escapeHtml(r.matchId || '—');
-            let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
-            let borrowNameHtml = escapeHtml(r.borrowName);
-            if (r.isStaff && r.statusDetail === 'メール未登録') {
-              borrowNameHtml = `<span class="staff-link" onclick="registerStaffPrompt('${escapeJsStr(r.id)}', '${escapeJsStr(r.borrowName)}')">${escapeHtml(r.borrowName)}</span>`;
-            }
-
-            html += `<tr>
-              <td class="${statusClass}">${escapeHtml(statusText)}</td>
-              <td>${escapeHtml(cat)}</td>
-              <td>${matchIdHtml}</td>
-              <td>${rosterNameHtml}</td>
-              <td>${borrowNameHtml}</td>
-              <td>${escapeHtml(r.classInfo)}</td>
-              <td>${escapeHtml(r.title)}</td>
-              <td>${escapeHtml(r.borrowDate)}</td>
-              <td>${escapeHtml(r.dueDate)}</td>
-              <td>${escapeHtml(r.nendo)}</td>
-              <td>${escapeHtml(r.rosterNendo || '')}</td>
-              <td>${escapeHtml(r.rosterSheet)}</td>
-              <td>${r.email ? escapeHtml(r.email) : '<span style="color:#999;">—</span>'}</td>
-            </tr>`;
-          });
-        }
-
-        html += '</tbody></table></div></div>';
-        previewEl.innerHTML = html;
-      }
-
-      function registerStaffPrompt(id, name) {
-        let email = prompt(`${name} 先生のメールアドレスを登録・変更しますか？\nアドレスを入力してください:`);
-        if (email !== null) {
-          if (email.trim() === "") return alert("アドレスが入力されていません。");
-          google.script.run.withSuccessHandler(function(msg) {
-            alert(msg);
-            refreshOverduePreview();
-          }).withFailureHandler(err => alert("エラー: " + err.message)).registerStaffEmail(id, name, email.trim());
-        }
-      }
 
       function normalizeId(classInfo, name) {
         let match = classInfo.match(/(中学|高校).*?(\d+)年([A-Za-z0-9]+)組(\d+)番/);
@@ -962,269 +217,69 @@
         return (classInfo.includes("中学") ? "1_" : "2_") + id;
       }
 
-      function getCurrentNendo() {
-        const now = new Date();
-        let y = now.getFullYear();
-        let m = now.getMonth() + 1;
-        return m <= 3 ? y - 1 : y;
-      }
-
-      function getRecordCategory(r) {
-        if (r.generatedId && r.generatedId.startsWith('STAFF')) return '職員';
-        if (r.classInfo && r.classInfo.includes('高校')) return '高校';
-        if (r.classInfo && r.classInfo.includes('中学')) return '中学';
-        return 'その他';
-      }
-
-      function getAvailableNendos(records) {
-        let set = new Set();
-        records.forEach(r => { if (r.nendo !== undefined && r.nendo !== null && r.nendo !== '') set.add(String(r.nendo)); });
-        return Array.from(set).sort((a, b) => {
-          if (a === '不明') return 1;
-          if (b === '不明') return -1;
-          return parseInt(b, 10) - parseInt(a, 10);
-        });
-      }
-
-      function filterPrintRecords(records) {
-        const s = printViewState;
-        const nendoActive = s.nendos.length > 0;
-        const catActive = s.categories.length > 0;
-
-        return records.filter(r => {
-          const matchNendo = s.nendos.includes(String(r.nendo));
-          const matchCat = s.categories.includes(getRecordCategory(r));
-
-          if (!nendoActive && !catActive) return true;
-          if (s.combineMode === 'and') {
-            if (nendoActive && catActive) return matchNendo && matchCat;
-            if (nendoActive) return matchNendo;
-            return matchCat;
-          }
-          return (nendoActive && matchNendo) || (catActive && matchCat);
-        });
-      }
-
-      function getPrintFilterSummary() {
-        const s = printViewState;
-        const nendoLabel = s.nendos.length > 0 ? s.nendos.map(n => n + '年度').join('・') : '全年度';
-        const catMap = { '中学': '中学生', '高校': '高校生', '職員': '職員・教職員' };
-        const catLabel = s.categories.length > 0 ? s.categories.map(c => catMap[c] || c).join('・') : '全区分';
-        const combineLabel = s.combineMode === 'and' ? 'かつ' : 'または';
-        if (s.nendos.length > 0 && s.categories.length > 0) {
-          return `${nendoLabel} ${combineLabel} ${catLabel}`;
-        }
-        return nendoLabel + ' / ' + catLabel;
-      }
-
-      function readPrintFilterStateFromDom() {
-        printViewState.nendos = Array.from(document.querySelectorAll('.pf-nendo:checked')).map(el => el.value);
-        printViewState.categories = Array.from(document.querySelectorAll('.pf-print-cat:checked')).map(el => el.value);
-        const combineEl = document.querySelector('input[name="pf-print-combine"]:checked');
-        if (combineEl) printViewState.combineMode = combineEl.value;
-      }
-
-      function onPrintFilterChange() {
-        readPrintFilterStateFromDom();
-        renderPrintFilterPanel();
-        renderPrintableLists();
-      }
-
-      function resetPrintFilters() {
-        printViewState.nendos = printAvailableNendos.slice();
-        printViewState.categories = ['中学', '高校', '職員'];
-        printViewState.combineMode = 'and';
-        renderPrintFilterPanel();
-        renderPrintableLists();
-      }
-
-      function applyPrintPreset(preset) {
-        const cur = String(getCurrentNendo());
-        if (preset === 'all') {
-          printViewState.nendos = printAvailableNendos.slice();
-          printViewState.categories = ['中学', '高校', '職員'];
-        } else if (preset === 'cur') {
-          printViewState.nendos = [cur];
-          printViewState.categories = ['中学', '高校', '職員'];
-        } else if (preset === 'cur_j') {
-          printViewState.nendos = [cur];
-          printViewState.categories = ['中学'];
-        } else if (preset === 'cur_h') {
-          printViewState.nendos = [cur];
-          printViewState.categories = ['高校'];
-        } else if (preset === 'cur_s') {
-          printViewState.nendos = [cur];
-          printViewState.categories = ['職員'];
-        }
-        printViewState.combineMode = 'and';
-        renderPrintFilterPanel();
-        renderPrintableLists();
-      }
-
-      function renderPrintFilterPanel() {
-        const panelEl = document.getElementById('printFilterSection');
-        if (!panelEl) return;
-
-        const s = printViewState;
-        const filteredCount = filterPrintRecords(printOverdueRecords).length + filterPrintRecords(printFutureRecords).length;
-        const totalCount = printOverdueRecords.length + printFutureRecords.length;
-        const cur = String(getCurrentNendo());
-
-        let nendoChecks = printAvailableNendos.map(n => {
-          let lbl = n === cur ? `${n}年度（今年度）` : `${n}年度`;
-          if (n === '不明') lbl = '不明';
-          return `<label><input type="checkbox" class="pf-nendo" value="${escapeHtml(n)}" ${s.nendos.includes(n) ? 'checked' : ''} onchange="onPrintFilterChange()"> ${lbl}</label>`;
-        }).join('');
-
-        panelEl.innerHTML = `
-          <div class="print-filter-panel no-print">
-            <h3>印刷用フィルタ（年度・区分）</h3>
-            <div class="print-filter-summary">
-              条件: <strong>${escapeHtml(getPrintFilterSummary())}</strong>
-              <span class="preview-filtered-count">　｜　表示 ${filteredCount} / 全 ${totalCount}件</span>
-            </div>
-            <div class="print-preset-btns">
-              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_j')">今年度・中学生</button>
-              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_h')">今年度・高校生</button>
-              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_s')">今年度・職員</button>
-              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur')">今年度のみ</button>
-              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('all')">すべて表示</button>
-              <button type="button" class="preview-reset-btn" onclick="resetPrintFilters()">リセット</button>
-            </div>
-            <div class="preview-filter-row">
-              <div class="preview-filter-group">
-                <strong>貸出年度</strong>
-                ${nendoChecks || '<span style="color:#999;">データなし</span>'}
-              </div>
-            </div>
-            <div class="preview-filter-row">
-              <div class="preview-filter-group">
-                <strong>区分</strong>
-                <label><input type="checkbox" class="pf-print-cat" value="中学" ${s.categories.includes('中学') ? 'checked' : ''} onchange="onPrintFilterChange()"> 中学生</label>
-                <label><input type="checkbox" class="pf-print-cat" value="高校" ${s.categories.includes('高校') ? 'checked' : ''} onchange="onPrintFilterChange()"> 高校生</label>
-                <label><input type="checkbox" class="pf-print-cat" value="職員" ${s.categories.includes('職員') ? 'checked' : ''} onchange="onPrintFilterChange()"> 職員・教職員</label>
-              </div>
-              <div class="preview-filter-group">
-                <strong>条件の結合</strong>
-                <div class="preview-combine-toggle">
-                  <label><input type="radio" name="pf-print-combine" value="and" ${s.combineMode === 'and' ? 'checked' : ''} onchange="onPrintFilterChange()">AND</label>
-                  <label><input type="radio" name="pf-print-combine" value="or" ${s.combineMode === 'or' ? 'checked' : ''} onchange="onPrintFilterChange()">OR</label>
-                </div>
-                <span style="font-size:11px; color:#7f8c8d;">（年度条件と区分条件の結合方法）</span>
-              </div>
-            </div>
-          </div>`;
-      }
-
-      function renderPrintableLists() {
-        const printableDiv = document.getElementById('printableListsSection');
-        if (!printableDiv) return;
-        printableDiv.innerHTML = '';
-
-        let banner = document.createElement('div');
-        banner.className = 'print-filter-banner';
-        banner.innerText = '印刷条件: ' + getPrintFilterSummary();
-        printableDiv.appendChild(banner);
-
-        const filteredOverdue = filterPrintRecords(printOverdueRecords);
-        const filteredFuture = filterPrintRecords(printFutureRecords);
-
-        buildNendoSections(filteredOverdue, '督促', '督促対象リスト', printableDiv);
-        buildNendoSections(filteredFuture, '予約', '自動予約対象リスト', printableDiv);
-      }
-
-      function buildNendoSections(records, statusLabel, listTitle, container) {
-        let titleColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
-        let borderColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
-
-        if (records.length === 0) {
-          let noData = document.createElement('div');
-          noData.className = 'no-print';
-          noData.style.marginBottom = '30px';
-          noData.style.color = '#7f8c8d';
-          noData.innerText = `現在、${statusLabel}対象でフィルタ条件に一致するデータはありません。`;
-          container.appendChild(noData);
-          return;
-        }
-
-        let listHeader = document.createElement('h2');
-        listHeader.className = 'list-type-header';
-        listHeader.innerText = listTitle;
-        listHeader.style.color = titleColor;
-        listHeader.style.borderBottomColor = borderColor;
-        container.appendChild(listHeader);
-
-        let byNendo = {};
-        records.forEach(r => {
-          if (!byNendo[r.nendo]) byNendo[r.nendo] = [];
-          byNendo[r.nendo].push(r);
-        });
-
-        let nendos = Object.keys(byNendo).sort((a, b) => {
-          if (a === "不明") return 1;
-          if (b === "不明") return -1;
-          return b - a;
-        });
-
-        nendos.forEach(nendo => {
-          let nendoRecords = byNendo[nendo];
-          let nendoSection = document.createElement('div');
-          nendoSection.className = 'nendo-section';
-
-          let nendoTitle = document.createElement('h3');
-          nendoTitle.className = 'nendo-title';
-          nendoTitle.innerText = `${nendo}年度（貸出分 ${nendoRecords.length}件）`;
-          nendoTitle.style.borderLeftColor = borderColor;
-          nendoSection.appendChild(nendoTitle);
-
-          let groupedClasses = groupRecordsByClass(nendoRecords);
-          buildSectionHtml(groupedClasses, nendoSection, statusLabel);
-
-          container.appendChild(nendoSection);
-        });
-      }
-
-      // 年度別のセクション分割と描画処理（印刷時は年度ごとに改ページ）
       function renderPrintLayout() {
-        const printSection = document.getElementById('printSection'); 
-        printSection.innerHTML = '';
+        const printSection = document.getElementById('printSection');
+        printSection.innerHTML = ''; 
 
-        let previewDiv = document.createElement('div');
-        previewDiv.id = 'overduePreviewSection';
-        previewDiv.className = 'no-print';
-        printSection.appendChild(previewDiv);
+        let today = new Date(); 
+        today.setHours(0,0,0,0);
 
-        let filterDiv = document.createElement('div');
-        filterDiv.id = 'printFilterSection';
-        printSection.appendChild(filterDiv);
+        let overdueRecords = [];
+        let futureRecords = [];
 
-        let printableDiv = document.createElement('div');
-        printableDiv.id = 'printableListsSection';
-        printSection.appendChild(printableDiv);
-
-        let today = new Date(); today.setHours(0,0,0,0);
-
-        printOverdueRecords = [];
-        printFutureRecords = [];
         parsedRecords.forEach(r => {
           let dStr = r.dueDate.split('/');
-          let dueDate = new Date(dStr[0], dStr[1]-1, dStr[2]);
+          let dueDate = new Date(dStr[0], dStr[1]-1, dStr[2]); 
           dueDate.setHours(0,0,0,0);
-          if (dueDate < today) printOverdueRecords.push(r);
-          else printFutureRecords.push(r);
+          if (dueDate < today) {
+            overdueRecords.push(r);
+          } else {
+            futureRecords.push(r);
+          }
         });
 
-        printAvailableNendos = getAvailableNendos([...printOverdueRecords, ...printFutureRecords]);
-        if (printViewState.nendos.length === 0 || !printViewState.nendos.some(n => printAvailableNendos.includes(n))) {
-          printViewState.nendos = printAvailableNendos.slice();
+        // ----------------------------------------------------
+        // ① 【督促対象セクション】（印刷される部分）
+        // ----------------------------------------------------
+        let overdueTitle = document.createElement('h3');
+        overdueTitle.innerText = `🔴 督促対象リスト（印刷用: ${overdueRecords.length}件）`;
+        overdueTitle.style.color = '#c0392b';
+        overdueTitle.style.borderBottom = '2px solid #c0392b';
+        printSection.appendChild(overdueTitle);
+
+        if (overdueRecords.length === 0) {
+          let noData = document.createElement('div');
+          noData.innerText = '現在、督促対象（期限超過）のデータはありません。';
+          noData.style.marginBottom = '30px';
+          printSection.appendChild(noData);
         } else {
-          printViewState.nendos = printViewState.nendos.filter(n => printAvailableNendos.includes(n));
-          if (printViewState.nendos.length === 0) printViewState.nendos = printAvailableNendos.slice();
+          let groupedOverdue = groupRecordsByClass(overdueRecords);
+          buildSectionHtml(groupedOverdue, printSection, '督促');
         }
 
-        renderPrintFilterPanel();
-        renderPrintableLists();
-        refreshOverduePreview();
+        // ----------------------------------------------------
+        // ② 【予約対象セクション】（画面確認のみ・印刷時は消える）
+        // ----------------------------------------------------
+        let futureTitle = document.createElement('h3');
+        futureTitle.className = 'no-print';
+        futureTitle.innerText = `🟢 自動予約対象リスト（画面確認用・印刷されません: ${futureRecords.length}件）`;
+        futureTitle.style.color = '#27ae60';
+        futureTitle.style.borderBottom = '2px solid #27ae60';
+        futureTitle.style.marginTop = '40px';
+        printSection.appendChild(futureTitle);
+
+        if (futureRecords.length === 0) {
+          let noData = document.createElement('div');
+          noData.className = 'no-print';
+          noData.innerText = '現在、自動予約の対象となるデータはありません。';
+          printSection.appendChild(noData);
+        } else {
+          let futureContainer = document.createElement('div');
+          futureContainer.className = 'no-print';
+          let groupedFuture = groupRecordsByClass(futureRecords);
+          buildSectionHtml(groupedFuture, futureContainer, '予約');
+          printSection.appendChild(futureContainer);
+        }
       }
 
       function groupRecordsByClass(records) {
@@ -1242,62 +297,107 @@
 
       function buildSectionHtml(groupedByClass, containerElement, statusLabel) {
         for (let key in groupedByClass) {
-          let group = groupedByClass[key]; let recs = group.records;
-          let sectionDiv = document.createElement('div'); 
-          sectionDiv.className = 'class-section';
-          
-          let header = document.createElement('div'); 
-          header.className = 'class-header'; 
-          header.innerHTML = `クラス: ${key} (${group.className})`; 
+          let group = groupedByClass[key];
+          let recs = group.records;
+
+          let sectionDiv = document.createElement('div');
+          sectionDiv.className = statusLabel === '督促' ? 'class-section' : '';
+          sectionDiv.style.marginBottom = '20px';
+
+          let header = document.createElement('div');
+          header.className = 'class-header';
+          header.innerText = `クラス: ${key} (${group.className})`;
           sectionDiv.appendChild(header);
-          
-          let flexDiv = document.createElement('div'); 
+
+          let flexDiv = document.createElement('div');
           flexDiv.className = 'two-col-layout';
-          
-          let half = Math.ceil(recs.length / 2); 
-          let leftRecs = recs.slice(0, half); 
+
+          let half = Math.ceil(recs.length / 2);
+          let leftRecs = recs.slice(0, half);
           let rightRecs = recs.slice(half);
 
           flexDiv.appendChild(createTable(leftRecs, statusLabel));
-          if (rightRecs.length > 0) flexDiv.appendChild(createTable(rightRecs, statusLabel));
-          sectionDiv.appendChild(flexDiv); 
+          if (rightRecs.length > 0) {
+            flexDiv.appendChild(createTable(rightRecs, statusLabel));
+          }
+
+          sectionDiv.appendChild(flexDiv);
           containerElement.appendChild(sectionDiv);
         }
       }
 
       function createTable(recs, statusLabel) {
-        let table = document.createElement('table'); table.className = 'col-table';
-        table.innerHTML = `<thead><tr><th class="id-col">4桁ID</th><th class="name-col">氏名</th><th class="date-col">貸出日</th><th class="date-col">返却日</th><th class="no-print">判定</th></tr></thead><tbody></tbody>`;
+        let table = document.createElement('table');
+        table.className = 'col-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th class="id-col">4桁ID</th>
+              <th class="name-col">氏名</th>
+              <th class="date-col">貸出日</th>
+              <th class="date-col">返却日</th>
+              <th class="no-print">判定</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
         let tbody = table.querySelector('tbody');
-        let statusHtml = statusLabel === '督促' ? '<span class="status-overdue">督促</span>' : '<span class="status-future">予約</span>';
+        let statusHtml = statusLabel === '督促' 
+          ? '<span class="status-overdue">督促</span>' 
+          : '<span class="status-future">予約</span>';
 
         recs.forEach(r => {
-          let isStaff = r.generatedId.startsWith("STAFF");
-          let displayId = isStaff ? "STAFF" : r.generatedId;
-          let displayName = isStaff ? `<span class="staff-link" onclick="registerStaffPrompt('${r.generatedId}', '${r.name}')">${r.name}</span>` : r.name;
           let tr = document.createElement('tr');
-          tr.innerHTML = `<td class="id-col">${displayId}</td><td class="name-col" title="${r.name}">${displayName}</td><td class="date-col">${r.borrowDate}</td><td class="date-col">${r.dueDate}</td><td class="no-print">${statusHtml}</td>`;
+          tr.innerHTML = `
+            <td class="id-col">${r.generatedId.startsWith("STAFF") ? "STAFF" : r.generatedId}</td>
+            <td class="name-col" title="${r.name}">${r.name}</td>
+            <td class="date-col">${r.borrowDate}</td>
+            <td class="date-col">${r.dueDate}</td>
+            <td class="no-print">${statusHtml}</td>
+          `;
           tbody.appendChild(tr);
         });
         return table;
       }
 
       function executeMails() {
-        if(systemRules.length === 0) return alert('⚠️ 詳細設定から適用ルールを1つ以上登録してください。');
         if (!confirm('【即時督促の送信】および【予約キューの最新化】を実行します。よろしいですか？')) return;
 
-        let currentSettings = getCurrentSettings();
-        localStorage.setItem('v11_settings', JSON.stringify(currentSettings));
-        document.getElementById('sendBtn').disabled = true;
+        let currentSettings = {
+          sheetName: document.getElementById('sheetName').value,
+          idCol: document.getElementById('idCol').value,
+          emailCol: document.getElementById('emailCol').value,
+          sendJ: document.getElementById('sendJ').checked,
+          sendH: document.getElementById('sendH').checked,
+          sendStaff: document.getElementById('sendStaff').checked,
+          subOverdue: document.getElementById('subOverdue').value,
+          tplOverdue: document.getElementById('tplOverdue').value,
+          subReminder: document.getElementById('subReminder').value,
+          tplReminder: document.getElementById('tplReminder').value
+        };
 
-        let payload = { records: parsedRecords, settings: currentSettings, rules: systemRules };
-        google.script.run.withSuccessHandler(function(msg) {
-          alert("処理が完了しました！\n\n" + msg);
-          document.getElementById('sendBtn').disabled = false;
-          refreshOverduePreview();
-        }).withFailureHandler(function(err) {
-          alert('エラー: ' + err.message); document.getElementById('sendBtn').disabled = false;
-        }).processMails(payload);
+        localStorage.setItem('v7_settings', JSON.stringify(currentSettings));
+
+        document.getElementById('sendBtn').disabled = true;
+        document.getElementById('loader').style.display = 'inline';
+
+        let payload = {
+          records: parsedRecords,
+          settings: currentSettings
+        };
+
+        google.script.run
+          .withSuccessHandler(function(msg) {
+            alert("処理が完了しました！\n\n" + msg);
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('sendBtn').disabled = false;
+          })
+          .withFailureHandler(function(err) {
+            alert('エラー: ' + err.message);
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('sendBtn').disabled = false;
+          })
+          .processMails(payload);
       }
     </script>
   </body>
