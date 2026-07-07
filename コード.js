@@ -31,16 +31,65 @@ function loadSettings() {
 }
 
 function parseYmdDate(value) {
-  if (!value) return null;
-  const parts = String(value).trim().split(/[\/\-]/);
-  if (parts.length !== 3) return null;
-  const y = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10) - 1;
-  const d = parseInt(parts[2], 10);
-  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
-  const dt = new Date(y, m, d);
-  dt.setHours(0, 0, 0, 0);
-  return dt;
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    const dt = new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }
+  if (typeof value === "number" && !isNaN(value)) {
+    const base = new Date(1899, 11, 30);
+    const dt = new Date(base.getTime() + Math.floor(value) * 86400000);
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d{8}$/.test(raw)) {
+    const y = parseInt(raw.substring(0, 4), 10);
+    const m = parseInt(raw.substring(4, 6), 10) - 1;
+    const d = parseInt(raw.substring(6, 8), 10);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+    const dt = new Date(y, m, d);
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }
+
+  const parts = raw.split(/[\/\-]/);
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      const dt = new Date(y, m, d);
+      dt.setHours(0, 0, 0, 0);
+      return dt;
+    }
+  }
+
+  const fallback = new Date(raw);
+  if (!isNaN(fallback.getTime())) {
+    const dt = new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }
+  return null;
+}
+
+function formatYmdDate(value) {
+  const dt = parseYmdDate(value);
+  if (!dt) return "";
+  return Utilities.formatDate(dt, Session.getScriptTimeZone(), "yyyy/MM/dd");
+}
+
+function normalizeRosterConfig(config) {
+  const normalized = Object.assign({}, config);
+  normalized.startDate = formatYmdDate(config.startDate) || String(config.startDate || "").trim();
+  normalized.endDate = formatYmdDate(config.endDate) || String(config.endDate || "").trim();
+  return normalized;
 }
 
 function detectCategory(classInfo) {
@@ -153,17 +202,24 @@ function buildRosterContactMap(rosterConfig) {
 }
 
 function getRosterConfigs(settings) {
-  const sheetConfigs = loadRosterConfigsFromSheet();
-  if (sheetConfigs.length > 0) return sheetConfigs;
-
+  settings = settings || {};
   let parsed = [];
+
   if (settings.rosterConfigs) {
     try {
       parsed = JSON.parse(settings.rosterConfigs);
     } catch (e) {
       throw new Error("名簿設定（rosterConfigs）のJSON形式が不正です。");
     }
-  } else if (settings.sheetName && settings.idCol && settings.emailCol) {
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map(normalizeRosterConfig);
+    }
+  }
+
+  const sheetConfigs = loadRosterConfigsFromSheet();
+  if (sheetConfigs.length > 0) return sheetConfigs;
+
+  if (settings.sheetName && settings.idCol && settings.emailCol) {
     // 旧設定形式の後方互換
     parsed = [{
       name: "既定名簿",
@@ -176,9 +232,9 @@ function getRosterConfigs(settings) {
   }
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("名簿設定がありません。設定画面で名簿設定（JSON）を登録してください。");
+    throw new Error("名簿設定がありません。設定画面で名簿設定を登録してください。");
   }
-  return parsed;
+  return parsed.map(normalizeRosterConfig);
 }
 
 function loadRosterConfigsFromSheet() {
@@ -215,11 +271,11 @@ function loadRosterConfigsFromSheet() {
     const row = data[i];
     const sheetName = String(row[idx.sheetName] || "").trim();
     if (!sheetName) continue;
-    result.push({
+    result.push(normalizeRosterConfig({
       name: String(row[idx.name] || "").trim() || sheetName,
       sheetName: sheetName,
-      startDate: String(row[idx.startDate] || "").trim(),
-      endDate: String(row[idx.endDate] || "").trim(),
+      startDate: row[idx.startDate],
+      endDate: row[idx.endDate],
       startYear: idx.startYear >= 0 ? Number(row[idx.startYear]) : undefined,
       headerRow: idx.headerRow >= 0 && row[idx.headerRow] !== "" ? Number(row[idx.headerRow]) : 1,
       idMode: String(row[idx.idMode] || "direct").trim(),
@@ -230,7 +286,7 @@ function loadRosterConfigsFromSheet() {
       nameHeader: idx.nameHeader >= 0 ? String(row[idx.nameHeader] || "").trim() : "",
       emailHeader: idx.emailHeader >= 0 ? String(row[idx.emailHeader] || "").trim() : "",
       categoryHeader: idx.categoryHeader >= 0 ? String(row[idx.categoryHeader] || "").trim() : ""
-    });
+    }));
   }
   return result;
 }
@@ -273,12 +329,13 @@ function saveRosterConfigsFromUi(configs) {
     const canUseDirect = idMode === "direct" && String(c.idHeader || "").trim();
     const canUseParts = idMode === "parts" && String(c.gradeHeader || "").trim() && String(c.classHeader || "").trim() && String(c.numberHeader || "").trim();
     if (!(canUseDirect || canUseParts)) return;
+    const normalized = normalizeRosterConfig(c);
     values.push([
       String(c.name || c.sheetName).trim(),
       String(c.sheetName).trim(),
       Number(c.startYear),
-      String(c.startDate).trim(),
-      String(c.endDate).trim(),
+      normalized.startDate,
+      normalized.endDate,
       Number(c.headerRow || 1),
       idMode,
       String(c.idHeader || "").trim(),

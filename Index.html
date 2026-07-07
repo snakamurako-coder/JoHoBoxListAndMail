@@ -43,6 +43,13 @@
       .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
       .preview-table th, .preview-table td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
       .preview-table th { background: #eef3f7; white-space: nowrap; }
+      .preview-row-send-ok td { background-color: #e8f8ef; }
+      .preview-row-send-ng td { background-color: #fdecea; }
+      .preview-row-send-ok .preview-delivery-col { color: #1b7f3a; font-weight: bold; }
+      .preview-row-send-ng .preview-delivery-col { color: #c0392b; font-weight: bold; }
+      .preview-row-send-ok .preview-status-col { color: #1b7f3a; }
+      .preview-row-send-ng .preview-status-col { color: #c0392b; }
+      .preview-row-send-ng .preview-warning-col { color: #a93226; font-weight: bold; }
       .roster-card { border: 1px solid #dfe6ee; border-radius: 6px; padding: 10px; background: #fff; margin-top: 8px; }
       .roster-summary-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
       .roster-summary-table th, .roster-summary-table td { border: 1px solid #ddd; padding: 6px; }
@@ -590,24 +597,31 @@
         summary.innerText = `一覧件数: ${rows.length}件 / 全${previewRows.length}件（督促メール対象のみ）`;
         rows.forEach(r => {
           let tr = document.createElement('tr');
+          tr.className = getPreviewRowClass(r);
           const nameCell = renderRecipientCell(r);
           tr.innerHTML = `
-            <td>${r.status || ''}</td>
-            <td>${r.deliveryStatus || ''}</td>
-            <td>${r.category || ''}</td>
-            <td>${r.id || ''}</td>
-            <td>${r.rosterName || ''}</td>
-            <td>${r.borrowerName || ''}</td>
+            <td class="preview-status-col">${escapeHtml(r.status || '')}</td>
+            <td class="preview-delivery-col">${escapeHtml(r.deliveryStatus || '')}</td>
+            <td>${escapeHtml(r.category || '')}</td>
+            <td>${escapeHtml(r.id || '')}</td>
+            <td>${escapeHtml(r.rosterName || '')}</td>
+            <td>${escapeHtml(r.borrowerName || '')}</td>
             <td>${nameCell}</td>
-            <td>${r.email || ''}</td>
-            <td>${r.classInfo || ''}</td>
-            <td>${r.title || ''}</td>
-            <td>${r.borrowDate || ''}</td>
-            <td>${r.dueDate || ''}</td>
-            <td>${r.warning || ''}</td>
+            <td>${escapeHtml(r.email || '')}</td>
+            <td>${escapeHtml(r.classInfo || '')}</td>
+            <td>${escapeHtml(r.title || '')}</td>
+            <td>${escapeHtml(r.borrowDate || '')}</td>
+            <td>${escapeHtml(r.dueDate || '')}</td>
+            <td class="preview-warning-col">${escapeHtml(r.warning || '')}</td>
           `;
           tbody.appendChild(tr);
         });
+      }
+
+      function getPreviewRowClass(r) {
+        const ds = String(r.deliveryStatus || '');
+        if (ds.indexOf('送信可') === 0) return 'preview-row-send-ok';
+        return 'preview-row-send-ng';
       }
 
       function renderRecipientCell(r) {
@@ -801,8 +815,8 @@
         document.getElementById('editor_headerRow').value = r.headerRow || 1;
         document.getElementById('editor_idMode').value = r.idMode || 'direct';
         document.getElementById('editor_startYear').value = r.startYear || rosterMeta.currentYear;
-        document.getElementById('editor_startDate').value = r.startDate || `${rosterMeta.currentYear}/04/01`;
-        document.getElementById('editor_endDate').value = r.endDate || `${Number(rosterMeta.currentYear) + 1}/03/31`;
+        document.getElementById('editor_startDate').value = normalizeDateText(r.startDate) || r.startDate || `${rosterMeta.currentYear}/04/01`;
+        document.getElementById('editor_endDate').value = normalizeDateText(r.endDate) || r.endDate || `${Number(rosterMeta.currentYear) + 1}/03/31`;
         syncDatePickerFromText('start');
         syncDatePickerFromText('end');
         onEditorSheetOrHeaderChanged(() => {
@@ -935,9 +949,15 @@
         if (/^\d{8}$/.test(raw)) {
           return `${raw.substring(0,4)}/${raw.substring(4,6)}/${raw.substring(6,8)}`;
         }
-        const m = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-        if (!m) return '';
-        return `${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
+        const m = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (m) {
+          return `${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
+        }
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) {
+          return `${parsed.getFullYear()}/${String(parsed.getMonth()+1).padStart(2,'0')}/${String(parsed.getDate()).padStart(2,'0')}`;
+        }
+        return '';
       }
 
       function onEditorSheetOrHeaderChanged(callback) {
