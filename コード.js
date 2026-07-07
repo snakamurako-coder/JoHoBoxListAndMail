@@ -426,13 +426,31 @@ function selectRosterConfig(rosterConfigs, recordDate) {
 
 function lookupContactInRoster(rosterMap, rosterConfig, category, id) {
   const hasCategoryCol = !!String(rosterConfig.categoryHeader || "").trim();
-  if (category === "職員教職員") {
-    return rosterMap[id] || null;
-  }
   if (hasCategoryCol) {
     return rosterMap[`${category}|${id}`] || null;
   }
+  if (category === "職員教職員") {
+    return rosterMap[id] || null;
+  }
   return rosterMap[id] || null;
+}
+
+function getStrictPreviewValue(r, field) {
+  const fromRoster = r.contactSource === "roster";
+  const fromStaffOverride = r.contactSource === "staff_override";
+  if (field === "recipientName") {
+    if (!fromRoster && !fromStaffOverride) return "";
+    return String(r.resolvedName || "").trim();
+  }
+  if (field === "email") {
+    if (!fromRoster && !fromStaffOverride) return "";
+    return String(r.email || "").trim();
+  }
+  if (field === "id" || field === "lookupKey") {
+    if (!fromRoster && !fromStaffOverride) return "";
+    return field === "id" ? String(r.id || "").trim() : String(r.lookupKey || "").trim();
+  }
+  return "";
 }
 
 function resolveRecordsWithContacts(records, settings) {
@@ -448,8 +466,8 @@ function resolveRecordsWithContacts(records, settings) {
     const baseDateValue = dateBase === "dueDate" ? r.dueDate : r.borrowDate;
     const baseDate = parseYmdDate(baseDateValue);
     const selectedRoster = baseDate ? selectRosterConfig(rosterConfigs, baseDate) : null;
-    const rosterName = selectedRoster ? selectedRoster.name || selectedRoster.sheetName : "";
-    const rosterSheetName = selectedRoster ? selectedRoster.sheetName : "";
+    const rosterName = selectedRoster ? String(selectedRoster.name || "").trim() : "";
+    const rosterSheetName = selectedRoster ? String(selectedRoster.sheetName || "").trim() : "";
 
     let email = "";
     let resolvedName = "";
@@ -515,7 +533,8 @@ function getScheduledPreview(payload) {
         ((!r.classInfo.match(/(中学|高校)/)) && String(settings.sendStaff) === "true");
 
       const status = "督促（期限超過）";
-      const recipientName = r.resolvedName || r.name;
+      const recipientName = getStrictPreviewValue(r, "recipientName");
+      const previewEmail = getStrictPreviewValue(r, "email");
       let deliveryStatus = "";
       let warning = "";
       if (!isAllowed) {
@@ -523,7 +542,7 @@ function getScheduledPreview(payload) {
       } else if (!r.hasRoster && r.contactSource !== "staff_override") {
         deliveryStatus = "名簿未登録で送信不可";
         warning = "基準日に対応する名簿なし";
-      } else if (!r.email) {
+      } else if (!previewEmail) {
         if (r.category === "職員教職員") {
           deliveryStatus = "メールアドレス未登録";
           warning = "氏名をクリックしてメール登録";
@@ -533,25 +552,28 @@ function getScheduledPreview(payload) {
         }
       } else if (r.contactSource === "staff_override") {
         deliveryStatus = "送信可（教職員個別登録）";
-      } else {
+      } else if (r.contactSource === "roster") {
         deliveryStatus = "送信可";
+      } else {
+        deliveryStatus = "送信不可";
+        warning = "参照先が確定していません";
       }
 
-      if (r.contactSource === "roster" && r.resolvedName && r.name && r.resolvedName !== r.name) {
+      if (r.contactSource === "roster" && recipientName && r.name && recipientName !== r.name) {
         warning = warning ? `${warning} / 借用者名と名簿氏名が不一致` : "借用者名と名簿氏名が不一致";
       }
 
       rows.push({
-        id: r.id,
+        id: getStrictPreviewValue(r, "id"),
         category: r.category,
-        rosterName: r.rosterName,
-        rosterSheetName: r.rosterSheetName,
-        lookupKey: r.lookupKey,
+        rosterName: r.hasRoster ? r.rosterName : "",
+        rosterSheetName: r.hasRoster ? r.rosterSheetName : "",
+        lookupKey: getStrictPreviewValue(r, "lookupKey"),
         baseDateValue: r.baseDateValue,
         classInfo: r.classInfo,
         borrowerName: r.name,
         recipientName: recipientName,
-        email: r.email,
+        email: previewEmail,
         title: r.title,
         borrowDate: r.borrowDate,
         dueDate: r.dueDate,

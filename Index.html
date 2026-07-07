@@ -649,11 +649,12 @@
       }
 
       function renderRecipientCell(r) {
-        const name = escapeHtml(r.recipientName || r.borrowerName || '');
         if (r.category === '職員教職員' && !r.email) {
-          return `<span class="staff-register-link" onclick="registerStaffEmail('${escapeJs(r.borrowerName || '')}')">${name}</span>`;
+          const display = escapeHtml(r.recipientName || '');
+          const linkText = display || '（メール登録）';
+          return `<span class="staff-register-link" onclick="registerStaffEmail('${escapeJs(r.borrowerName || '')}')">${linkText}</span>`;
         }
-        return name;
+        return escapeHtml(r.recipientName || '');
       }
 
       function registerStaffEmail(name) {
