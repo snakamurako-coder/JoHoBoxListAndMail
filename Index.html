@@ -436,13 +436,37 @@
           text = `① ${dateLbl}が <strong>${prevDateStr}</strong> の場合、対応の名簿（ルール）が存在しないため、生徒に対しての督促・予約処理は行われません。<br>`;
         }
         
-        text += `② ${dateLbl}が <strong>${startStr} から ${endStr}</strong> までは、この名簿<strong>「${sheetName}」</strong>が使用されます。<br>`;
+        text += `② ${dateLbl}が <strong>${startStr} から ${endStr}</strong> までは、名簿<strong>「${sheetName}」</strong>が使用されます。<br>`;
         
         let nextDate = new Date(endVal);
         nextDate.setDate(nextDate.getDate() + 1);
         let nextDateStr = nextDate.getFullYear() + '/' + ('0' + (nextDate.getMonth() + 1)).slice(-2) + '/' + ('0' + nextDate.getDate()).slice(-2);
-        
-        text += `③ <strong>${nextDateStr}</strong> 以降に${actionLbl}書籍に関しては、新しい引き継ぎルールが登録されるまで、この名簿は使用されません。`;
+
+        // 追加しようとしているルールの終了日以降に続くルールがあるか確認
+        let nextRule = null;
+        for (let i = 0; i < systemRules.length; i++) {
+          let r = systemRules[i];
+          if (r.dateType !== dateType) continue;
+          let rStart = new Date(r.start);
+          if (rStart.getTime() >= nextDate.getTime()) {
+            if (!nextRule || rStart.getTime() < new Date(nextRule.start).getTime()) {
+              nextRule = r;
+            }
+          }
+        }
+
+        if (nextRule) {
+          let nrStart = String(nextRule.start || "").replace(/-/g, '/');
+          let nrEnd = String(nextRule.end || "").replace(/-/g, '/');
+          text += `③ ${dateLbl}が <strong>${nrStart} から ${nrEnd}</strong> までは、名簿<strong>「${nextRule.sheetName}」</strong>が使用されます。<br>`;
+
+          let nextAfterNext = new Date(nextRule.end);
+          nextAfterNext.setDate(nextAfterNext.getDate() + 1);
+          let nextAfterNextStr = nextAfterNext.getFullYear() + '/' + ('0' + (nextAfterNext.getMonth() + 1)).slice(-2) + '/' + ('0' + nextAfterNext.getDate()).slice(-2);
+          text += `④ <strong>${nextAfterNextStr}</strong> 以降に${actionLbl}書籍に関しては、新しい引き継ぎルールが登録されるまで、有効な名簿はありません。`;
+        } else {
+          text += `③ <strong>${nextDateStr}</strong> 以降に${actionLbl}書籍に関しては、新しい引き継ぎルールが登録されるまで、有効な名簿はありません。`;
+        }
         
         expDiv.innerHTML = `<div style="background:#fff7ed; border:1px solid #f97316; padding:12px; border-radius:6px; font-size:13px; line-height:1.6; color:#c2410c;"><strong>【新ルールの適用シミュレーション】</strong><br>${text}</div>`;
       }
