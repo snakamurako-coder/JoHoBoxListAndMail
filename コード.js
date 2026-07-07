@@ -162,10 +162,42 @@ function normalizeTo4DigitId(classInfo, name) {
 }
 
 // 日付文字列から貸出年度（4月始まり）を算出
+function normalizeDateString(input) {
+  if (input === null || input === undefined) return "";
+
+  if (Object.prototype.toString.call(input) === "[object Date]" && !isNaN(input.getTime())) {
+    const y = input.getFullYear();
+    const m = String(input.getMonth() + 1).padStart(2, "0");
+    const d = String(input.getDate()).padStart(2, "0");
+    return `${y}/${m}/${d}`;
+  }
+
+  const raw = String(input).trim();
+  if (!raw) return "";
+
+  // "2026年4月9日", "2026.4.9", "2026-04-09", "2026/4/9" を統一
+  const replaced = raw
+    .replace(/[年月]/g, "/")
+    .replace(/日/g, "")
+    .replace(/[.\-]/g, "/")
+    .replace(/\s+/g, "");
+
+  const parts = replaced.split("/").filter(Boolean);
+  if (parts.length < 3) return "";
+
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return "";
+  if (m < 1 || m > 12 || d < 1 || d > 31) return "";
+
+  return `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+}
+
 function getNendoFromDateStr(dateStr) {
-  if (!dateStr) return null;
-  let parts = String(dateStr).split(/[\/\-]/);
-  if (parts.length < 2) return null;
+  const norm = normalizeDateString(dateStr);
+  if (!norm) return null;
+  let parts = norm.split("/");
   let y = parseInt(parts[0], 10);
   let m = parseInt(parts[1], 10);
   if (isNaN(y) || isNaN(m)) return null;
@@ -173,12 +205,14 @@ function getNendoFromDateStr(dateStr) {
 }
 
 function parseRuleDate(dateStr) {
-  let parts = String(dateStr).split(/[\/\-]/);
-  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  const ms = parseDateMs(dateStr);
+  return new Date(ms);
 }
 
 function parseDateMs(dateStr) {
-  let parts = String(dateStr || "").split(/[\/\-]/);
+  const norm = normalizeDateString(dateStr);
+  if (!norm) return null;
+  let parts = norm.split("/");
   if (parts.length < 3) return null;
   let y = parseInt(parts[0], 10);
   let m = parseInt(parts[1], 10);
@@ -268,8 +302,10 @@ function buildMailPlan(records, settings, rules) {
   let rosterCache = {};
 
   records.forEach(r => {
+    const borrowDateNorm = normalizeDateString(r.borrowDate);
+    const dueDateNorm = normalizeDateString(r.dueDate);
     let isStaff = !r.classInfo.match(/(中学|高校)/);
-    let borrowNendo = getNendoFromDateStr(r.borrowDate);
+    let borrowNendo = getNendoFromDateStr(borrowDateNorm);
     let lookupId = normalizeTo4DigitId(r.classInfo, r.name);
     r.id = lookupId;
 
@@ -278,7 +314,7 @@ function buildMailPlan(records, settings, rules) {
     let ruleMatched = false;
     let matchedRule = null;
     let matchError = "";
-    let resolved = resolveRuleForRecord(rules, r.borrowDate, r.dueDate);
+    let resolved = resolveRuleForRecord(rules, borrowDateNorm, dueDateNorm);
 
     if (isStaff) {
       if (!rosterCache['STAFF']) rosterCache['STAFF'] = loadStaffRosterMaps();
@@ -309,7 +345,7 @@ function buildMailPlan(records, settings, rules) {
                     (r.classInfo.includes("高校") && String(settings.sendH) === "true") ||
                     (isStaff && String(settings.sendStaff) === "true");
 
-    let dueMs = parseDateMs(r.dueDate);
+    let dueMs = parseDateMs(dueDateNorm);
     let isOverdue = dueMs !== null && dueMs < today.getTime();
 
     if (isOverdue) {
@@ -344,8 +380,8 @@ function buildMailPlan(records, settings, rules) {
         statusDetail: statusDetail,
         title: r.title,
         classInfo: r.classInfo,
-        borrowDate: r.borrowDate,
-        dueDate: r.dueDate,
+        borrowDate: borrowDateNorm || r.borrowDate,
+        dueDate: dueDateNorm || r.dueDate,
         nendo: borrowNendo != null ? String(borrowNendo) : (r.nendo || ""),
         rosterSheet: isStaff ? "教職員名簿" : (matchedRule ? matchedRule.sheetName : ""),
         rosterNendo: isStaff ? "教職員" : (matchedRule ? getRuleNendoLabel(matchedRule) : ""),
@@ -365,7 +401,7 @@ function buildMailPlan(records, settings, rules) {
       } else if (matchError === "日付形式不正") {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日または返却日の形式が不正です: 貸出=${r.borrowDate}, 返却=${r.dueDate})`);
       } else if (!ruleMatched) {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対応する名簿ルールがありません)`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${borrowDateNorm || r.borrowDate} に対応する名簿ルールがありません)`);
       } else {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」に照合ID[${lookupId}]が見つかりません)`);
       }
