@@ -71,6 +71,23 @@
       .preview-status-skip { color: #c0392b; font-weight: bold; }
       .preview-status-off { color: #7f8c8d; }
       .preview-name-diff { color: #d35400; font-weight: bold; }
+      .preview-controls { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin-bottom: 12px; font-size: 13px; }
+      .preview-filter-row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 8px; }
+      .preview-filter-row:last-child { margin-bottom: 0; }
+      .preview-filter-group { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+      .preview-filter-group strong { color: #555; margin-right: 4px; }
+      .preview-filter-group label { cursor: pointer; white-space: nowrap; }
+      .preview-combine-toggle { display: inline-flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
+      .preview-combine-toggle label { padding: 4px 12px; margin: 0; background: #f5f5f5; cursor: pointer; font-size: 12px; }
+      .preview-combine-toggle label:has(input:checked) { background: #3498db; color: white; }
+      .preview-combine-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+      .preview-reset-btn { padding: 4px 10px; font-size: 12px; border: 1px solid #bbb; background: #fafafa; border-radius: 4px; cursor: pointer; }
+      .preview-reset-btn:hover { background: #eee; }
+      .preview-table th.sortable { cursor: pointer; user-select: none; }
+      .preview-table th.sortable:hover { background: #e8c4c4; }
+      .preview-table th .sort-ind { font-size: 10px; color: #888; margin-left: 3px; }
+      .preview-table th.sort-active .sort-ind { color: #c0392b; font-weight: bold; }
+      .preview-filtered-count { font-size: 12px; color: #7f8c8d; }
 
       @media print {
         body * { visibility: hidden; }
@@ -233,7 +250,15 @@
     <script>
       let parsedRecords = [];
       let systemRules = []; 
-      let sheetList = [];   
+      let sheetList = [];
+      let overduePreviewRows = [];
+      let previewViewState = {
+        sortCol: 'borrowDate',
+        sortDir: -1,
+        statuses: ['送信予定', '送信不可', '対象外'],
+        categories: ['中学', '高校', '職員'],
+        combineMode: 'and'
+      };
 
       function toggleAdvanced() {
         const div = document.getElementById('advancedSettings');
@@ -578,63 +603,225 @@
           .previewOverdueMails(payload);
       }
 
+      function getPreviewCategory(r) {
+        if (r.isStaff) return '職員';
+        if (r.classInfo && r.classInfo.includes('高校')) return '高校';
+        if (r.classInfo && r.classInfo.includes('中学')) return '中学';
+        return 'その他';
+      }
+
+      function parsePreviewDate(str) {
+        if (!str) return 0;
+        let p = String(str).split('/');
+        if (p.length < 3) return 0;
+        return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)).getTime();
+      }
+
+      function getPreviewSortValue(row, col) {
+        switch (col) {
+          case 'status':
+            return ({ '送信予定': '0', '送信不可': '1', '対象外': '2' }[row.status] || '9') + (row.statusDetail || '');
+          case 'rosterName': return row.rosterName || '';
+          case 'borrowName': return row.borrowName || '';
+          case 'classInfo': return row.classInfo || '';
+          case 'title': return row.title || '';
+          case 'borrowDate': return parsePreviewDate(row.borrowDate);
+          case 'dueDate': return parsePreviewDate(row.dueDate);
+          case 'nendo':
+            return row.nendo === '不明' ? -1 : (parseInt(row.nendo, 10) || 0);
+          case 'rosterSheet': return row.rosterSheet || '';
+          case 'email': return row.email || '';
+          case 'category': return getPreviewCategory(row);
+          default: return '';
+        }
+      }
+
+      function comparePreviewRows(a, b, col, dir) {
+        let va = getPreviewSortValue(a, col);
+        let vb = getPreviewSortValue(b, col);
+        let cmp = 0;
+        if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+        else cmp = String(va).localeCompare(String(vb), 'ja');
+        return cmp * dir;
+      }
+
+      function getFilteredPreviewRows() {
+        const s = previewViewState;
+        const statusActive = s.statuses.length > 0;
+        const catActive = s.categories.length > 0;
+
+        return overduePreviewRows.filter(row => {
+          const matchStatus = s.statuses.includes(row.status);
+          const matchCat = s.categories.includes(getPreviewCategory(row));
+
+          if (!statusActive && !catActive) return true;
+          if (s.combineMode === 'and') {
+            if (statusActive && catActive) return matchStatus && matchCat;
+            if (statusActive) return matchStatus;
+            return matchCat;
+          }
+          return (statusActive && matchStatus) || (catActive && matchCat);
+        });
+      }
+
+      function getSortedPreviewRows(rows) {
+        const col = previewViewState.sortCol;
+        const dir = previewViewState.sortDir;
+        return rows.slice().sort((a, b) => comparePreviewRows(a, b, col, dir));
+      }
+
+      function readPreviewFilterStateFromDom() {
+        const statusEls = document.querySelectorAll('.pf-status:checked');
+        const catEls = document.querySelectorAll('.pf-cat:checked');
+        previewViewState.statuses = Array.from(statusEls).map(el => el.value);
+        previewViewState.categories = Array.from(catEls).map(el => el.value);
+        const combineEl = document.querySelector('input[name="pf-combine"]:checked');
+        if (combineEl) previewViewState.combineMode = combineEl.value;
+      }
+
+      function onPreviewFilterChange() {
+        readPreviewFilterStateFromDom();
+        paintOverduePreview();
+      }
+
+      function onPreviewSort(col) {
+        if (previewViewState.sortCol === col) {
+          previewViewState.sortDir *= -1;
+        } else {
+          previewViewState.sortCol = col;
+          previewViewState.sortDir = 1;
+        }
+        paintOverduePreview();
+      }
+
+      function resetPreviewFilters() {
+        previewViewState.statuses = ['送信予定', '送信不可', '対象外'];
+        previewViewState.categories = ['中学', '高校', '職員'];
+        previewViewState.combineMode = 'and';
+        previewViewState.sortCol = 'borrowDate';
+        previewViewState.sortDir = -1;
+        paintOverduePreview();
+      }
+
       function renderOverduePreview(rows) {
+        overduePreviewRows = rows || [];
+        paintOverduePreview();
+      }
+
+      function paintOverduePreview() {
         const previewEl = document.getElementById('overduePreviewSection');
         if (!previewEl) return;
 
-        let sendCount = rows.filter(r => r.willSend).length;
-        let skipCount = rows.filter(r => r.status === '送信不可').length;
-        let offCount = rows.filter(r => r.status === '対象外').length;
+        const allRows = overduePreviewRows;
+        const filteredRows = getSortedPreviewRows(getFilteredPreviewRows());
+
+        let sendCount = allRows.filter(r => r.willSend).length;
+        let skipCount = allRows.filter(r => r.status === '送信不可').length;
+        let offCount = allRows.filter(r => r.status === '対象外').length;
+        const s = previewViewState;
 
         let html = `
           <div class="preview-section">
             <h2>即時督促メール送信プレビュー</h2>
             <div class="preview-summary">
-              期限超過 ${rows.length}件 —
+              期限超過 ${allRows.length}件 —
               <span class="preview-status-send">送信予定 ${sendCount}件</span> /
               <span class="preview-status-skip">送信不可 ${skipCount}件</span> /
               <span class="preview-status-off">対象外 ${offCount}件</span>
+              <span class="preview-filtered-count">　｜　表示 ${filteredRows.length}件</span>
               <span style="font-size:11px; color:#7f8c8d; margin-left:8px;">（この一覧は印刷されません）</span>
             </div>`;
 
-        if (rows.length === 0) {
+        if (allRows.length === 0) {
           html += '<p style="color:#7f8c8d; font-size:13px;">現在、即時督促の対象となる期限超過データはありません。</p></div>';
           previewEl.innerHTML = html;
           return;
         }
 
-        html += `<table class="preview-table"><thead><tr>
-          <th>ステータス</th><th>宛先氏名（名簿）</th><th>貸出データ氏名</th><th>クラス</th>
-          <th>書籍名</th><th>貸出日</th><th>返却期限</th><th>貸出年度</th><th>参照名簿</th><th>メール</th>
-        </tr></thead><tbody>`;
+        html += `
+          <div class="preview-controls">
+            <div class="preview-filter-row">
+              <div class="preview-filter-group">
+                <strong>ステータス</strong>
+                <label><input type="checkbox" class="pf-status" value="送信予定" ${s.statuses.includes('送信予定') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 送信予定</label>
+                <label><input type="checkbox" class="pf-status" value="送信不可" ${s.statuses.includes('送信不可') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 送信不可</label>
+                <label><input type="checkbox" class="pf-status" value="対象外" ${s.statuses.includes('対象外') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 対象外</label>
+              </div>
+            </div>
+            <div class="preview-filter-row">
+              <div class="preview-filter-group">
+                <strong>区分</strong>
+                <label><input type="checkbox" class="pf-cat" value="中学" ${s.categories.includes('中学') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 中学生</label>
+                <label><input type="checkbox" class="pf-cat" value="高校" ${s.categories.includes('高校') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 高校生</label>
+                <label><input type="checkbox" class="pf-cat" value="職員" ${s.categories.includes('職員') ? 'checked' : ''} onchange="onPreviewFilterChange()"> 職員・教職員</label>
+              </div>
+              <div class="preview-filter-group">
+                <strong>条件の結合</strong>
+                <div class="preview-combine-toggle">
+                  <label><input type="radio" name="pf-combine" value="and" ${s.combineMode === 'and' ? 'checked' : ''} onchange="onPreviewFilterChange()">AND</label>
+                  <label><input type="radio" name="pf-combine" value="or" ${s.combineMode === 'or' ? 'checked' : ''} onchange="onPreviewFilterChange()">OR</label>
+                </div>
+                <span style="font-size:11px; color:#7f8c8d;">（ステータス条件と区分条件の結合方法）</span>
+              </div>
+              <button type="button" class="preview-reset-btn" onclick="resetPreviewFilters()">フィルタ・並び順をリセット</button>
+            </div>
+          </div>`;
 
-        rows.forEach(r => {
-          let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
-          let statusText = r.statusDetail ? `${r.status}（${r.statusDetail}）` : r.status;
+        const cols = [
+          { key: 'status', label: 'ステータス' },
+          { key: 'category', label: '区分' },
+          { key: 'rosterName', label: '宛先氏名（名簿）' },
+          { key: 'borrowName', label: '貸出データ氏名' },
+          { key: 'classInfo', label: 'クラス' },
+          { key: 'title', label: '書籍名' },
+          { key: 'borrowDate', label: '貸出日' },
+          { key: 'dueDate', label: '返却期限' },
+          { key: 'nendo', label: '貸出年度' },
+          { key: 'rosterSheet', label: '参照名簿' },
+          { key: 'email', label: 'メール' }
+        ];
 
-          let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
-          let borrowNameHtml = escapeHtml(r.borrowName);
-          if (r.isStaff && r.statusDetail === 'メール未登録') {
-            borrowNameHtml = `<span class="staff-link" onclick="registerStaffPrompt('${escapeJsStr(r.id)}', '${escapeJsStr(r.borrowName)}')">${escapeHtml(r.borrowName)}</span>`;
-          }
-
-          let nameDiffClass = (r.rosterName && r.borrowName && r.rosterName.replace(/[\s　]+/g, '') !== r.borrowName.replace(/[\s　]+/g, '')) ? ' preview-name-diff' : '';
-
-          html += `<tr>
-            <td class="${statusClass}">${escapeHtml(statusText)}</td>
-            <td class="${nameDiffClass}">${rosterNameHtml}</td>
-            <td>${borrowNameHtml}</td>
-            <td>${escapeHtml(r.classInfo)}</td>
-            <td>${escapeHtml(r.title)}</td>
-            <td>${escapeHtml(r.borrowDate)}</td>
-            <td>${escapeHtml(r.dueDate)}</td>
-            <td>${escapeHtml(r.nendo)}</td>
-            <td>${escapeHtml(r.rosterSheet)}</td>
-            <td>${r.email ? escapeHtml(r.email) : '<span style="color:#999;">—</span>'}</td>
-          </tr>`;
+        html += '<div style="overflow-x:auto;"><table class="preview-table"><thead><tr>';
+        cols.forEach(c => {
+          let active = s.sortCol === c.key ? ' sort-active' : '';
+          let ind = s.sortCol === c.key ? (s.sortDir > 0 ? '▲' : '▼') : '⇅';
+          html += `<th class="sortable${active}" onclick="onPreviewSort('${c.key}')">${c.label}<span class="sort-ind">${ind}</span></th>`;
         });
+        html += '</tr></thead><tbody>';
 
-        html += '</tbody></table></div>';
+        if (filteredRows.length === 0) {
+          html += '<tr><td colspan="11" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
+        } else {
+          filteredRows.forEach(r => {
+            let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
+            let statusText = r.statusDetail ? `${r.status}（${r.statusDetail}）` : r.status;
+            let cat = getPreviewCategory(r);
+
+            let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
+            let borrowNameHtml = escapeHtml(r.borrowName);
+            if (r.isStaff && r.statusDetail === 'メール未登録') {
+              borrowNameHtml = `<span class="staff-link" onclick="registerStaffPrompt('${escapeJsStr(r.id)}', '${escapeJsStr(r.borrowName)}')">${escapeHtml(r.borrowName)}</span>`;
+            }
+
+            let nameDiffClass = (r.rosterName && r.borrowName && r.rosterName.replace(/[\s　]+/g, '') !== r.borrowName.replace(/[\s　]+/g, '')) ? ' preview-name-diff' : '';
+
+            html += `<tr>
+              <td class="${statusClass}">${escapeHtml(statusText)}</td>
+              <td>${escapeHtml(cat)}</td>
+              <td class="${nameDiffClass}">${rosterNameHtml}</td>
+              <td>${borrowNameHtml}</td>
+              <td>${escapeHtml(r.classInfo)}</td>
+              <td>${escapeHtml(r.title)}</td>
+              <td>${escapeHtml(r.borrowDate)}</td>
+              <td>${escapeHtml(r.dueDate)}</td>
+              <td>${escapeHtml(r.nendo)}</td>
+              <td>${escapeHtml(r.rosterSheet)}</td>
+              <td>${r.email ? escapeHtml(r.email) : '<span style="color:#999;">—</span>'}</td>
+            </tr>`;
+          });
+        }
+
+        html += '</tbody></table></div></div>';
         previewEl.innerHTML = html;
       }
 
