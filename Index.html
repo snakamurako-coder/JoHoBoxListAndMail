@@ -40,6 +40,9 @@
       
       .status-overdue { color: #c0392b; font-weight: bold; }
       .status-future { color: #27ae60; font-weight: bold; }
+      .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+      .preview-table th, .preview-table td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
+      .preview-table th { background: #eef3f7; white-space: nowrap; }
 
       @media print {
         body * { visibility: hidden; }
@@ -63,11 +66,21 @@
       </div>
 
       <div class="section no-print">
-        <h3>2. スプレッドシート名簿データの連携設定</h3>
+        <h3>2. 名簿データ連携設定（期間で自動切替）</h3>
         <div class="flex-group">
-          <div class="form-item"><label>名簿シート名</label><input type="text" id="sheetName" value="連絡先"></div>
-          <div class="form-item"><label>4桁ID列番号 (例 Aなら1)</label><input type="number" id="idCol" value="1"></div>
-          <div class="form-item"><label>メール列番号 (例 Bなら2)</label><input type="number" id="emailCol" value="2"></div>
+          <div class="form-item">
+            <label>名簿選択の基準日</label>
+            <label><input type="radio" name="rosterDateBase" id="rosterDateBaseBorrow" value="borrowDate" checked> 貸出日</label>
+            <label style="margin-left:12px;"><input type="radio" name="rosterDateBase" id="rosterDateBaseDue" value="dueDate"> 返却日</label>
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <label style="display:block; font-size:13px; font-weight:bold; margin-bottom:5px;">名簿設定（JSON）</label>
+          <textarea id="rosterConfigs" style="height: 160px;"></textarea>
+          <div class="vars-help">
+            例: 2026年度なら startDate=2026/04/01, endDate=2027/03/31 を設定<br>
+            <span>名簿はコンテナバインド先SSの新シートとして登録し、名簿設定シート(name,sheetName,startDate,endDate,idCol,emailCol...)を優先参照します。</span>
+          </div>
         </div>
       </div>
 
@@ -108,7 +121,34 @@
       <div style="margin-bottom: 30px;" class="no-print">
         <button class="btn btn-primary" id="sendBtn" onclick="executeMails()" disabled style="margin-right: 15px;">一括処理を実行（即時督促 ＋ 予約更新）</button>
         <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled>クラス別・2段組リストを印刷する</button>
+        <button class="btn btn-primary" id="previewBtn" onclick="renderScheduledMailPreview()" disabled style="margin-left: 15px;">予定督促メールをプレビュー</button>
         <span id="loader" style="display:none; margin-left:15px; font-weight:bold; color:#3498db;">処理中...</span>
+      </div>
+
+      <div class="section no-print">
+        <h3>4. 予定督促メール一覧プレビュー（1行1件）</h3>
+        <div id="previewSummary" style="font-size:12px; color:#666;">ファイル読み込み後に表示されます。</div>
+        <div style="overflow-x:auto;">
+          <table class="preview-table" id="previewTable">
+            <thead>
+              <tr>
+                <th>判定</th>
+                <th>区分</th>
+                <th>4桁ID</th>
+                <th>名簿名</th>
+                <th>借用者氏名</th>
+                <th>送信先氏名</th>
+                <th>メール</th>
+                <th>クラス</th>
+                <th>書籍名</th>
+                <th>貸出日</th>
+                <th>返却日</th>
+                <th>警告</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
 
       <div id="printSection">
@@ -122,11 +162,28 @@
       const defTplOverdue = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書が返却期限を過ぎております。\n\n【書籍名】\n\n速やかにご返却ください。";
       const defSubReminder = "【図書室】返却期限間近のお知らせ";
       const defTplReminder = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
+      const defRosterConfigs = JSON.stringify([
+        {
+          name: "2026年度名簿",
+          sheetName: "連絡先_2026",
+          startDate: "2026/04/01",
+          endDate: "2027/03/31",
+          idCol: 1,
+          emailCol: 2,
+          categoryCol: 3,
+          nameCol: 4
+        }
+      ], null, 2);
 
       function applySettings(s) {
-        if(s.sheetName) document.getElementById('sheetName').value = s.sheetName;
-        if(s.idCol) document.getElementById('idCol').value = s.idCol;
-        if(s.emailCol) document.getElementById('emailCol').value = s.emailCol;
+        if (s.rosterDateBase === "dueDate") {
+          document.getElementById('rosterDateBaseDue').checked = true;
+        } else {
+          document.getElementById('rosterDateBaseBorrow').checked = true;
+        }
+        if (s.rosterConfigs) {
+          document.getElementById('rosterConfigs').value = s.rosterConfigs;
+        }
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
         if(s.sendStaff !== undefined) document.getElementById('sendStaff').checked = String(s.sendStaff) === "true";
@@ -138,15 +195,17 @@
       }
 
       window.onload = function() {
+        document.getElementById('rosterDateBaseBorrow').checked = true;
+        document.getElementById('rosterConfigs').value = defRosterConfigs;
+        document.getElementById('subOverdue').value = defSubOverdue;
+        document.getElementById('tplOverdue').value = defTplOverdue;
+        document.getElementById('subReminder').value = defSubReminder;
+        document.getElementById('tplReminder').value = defTplReminder;
+
         let localSettings = localStorage.getItem('v7_settings');
         if (localSettings) {
           applySettings(JSON.parse(localSettings));
           document.getElementById('syncStatus').innerText = "クラウド設定と同期中...";
-        } else {
-          document.getElementById('subOverdue').value = defSubOverdue;
-          document.getElementById('tplOverdue').value = defTplOverdue;
-          document.getElementById('subReminder').value = defSubReminder;
-          document.getElementById('tplReminder').value = defTplReminder;
         }
 
         google.script.run
@@ -202,6 +261,8 @@
           renderPrintLayout();
           document.getElementById('sendBtn').disabled = false;
           document.getElementById('printBtn').disabled = false;
+          document.getElementById('previewBtn').disabled = false;
+          renderScheduledMailPreview();
         };
         reader.readAsArrayBuffer(file);
       });
@@ -363,18 +424,8 @@
       function executeMails() {
         if (!confirm('【即時督促の送信】および【予約キューの最新化】を実行します。よろしいですか？')) return;
 
-        let currentSettings = {
-          sheetName: document.getElementById('sheetName').value,
-          idCol: document.getElementById('idCol').value,
-          emailCol: document.getElementById('emailCol').value,
-          sendJ: document.getElementById('sendJ').checked,
-          sendH: document.getElementById('sendH').checked,
-          sendStaff: document.getElementById('sendStaff').checked,
-          subOverdue: document.getElementById('subOverdue').value,
-          tplOverdue: document.getElementById('tplOverdue').value,
-          subReminder: document.getElementById('subReminder').value,
-          tplReminder: document.getElementById('tplReminder').value
-        };
+        let currentSettings = collectCurrentSettings();
+        if (!currentSettings) return;
 
         localStorage.setItem('v7_settings', JSON.stringify(currentSettings));
 
@@ -398,6 +449,81 @@
             document.getElementById('sendBtn').disabled = false;
           })
           .processMails(payload);
+      }
+
+      function collectCurrentSettings() {
+        let rosterConfigsRaw = document.getElementById('rosterConfigs').value.trim();
+        let rosterConfigsParsed;
+        try {
+          rosterConfigsParsed = JSON.parse(rosterConfigsRaw || "[]");
+          if (!Array.isArray(rosterConfigsParsed) || rosterConfigsParsed.length === 0) {
+            alert('名簿設定（JSON）に1件以上の設定が必要です。');
+            return null;
+          }
+        } catch (e) {
+          alert('名簿設定（JSON）の形式が不正です。\n' + e.message);
+          return null;
+        }
+
+        return {
+          rosterDateBase: document.querySelector('input[name="rosterDateBase"]:checked').value,
+          rosterConfigs: JSON.stringify(rosterConfigsParsed),
+          sendJ: document.getElementById('sendJ').checked,
+          sendH: document.getElementById('sendH').checked,
+          sendStaff: document.getElementById('sendStaff').checked,
+          subOverdue: document.getElementById('subOverdue').value,
+          tplOverdue: document.getElementById('tplOverdue').value,
+          subReminder: document.getElementById('subReminder').value,
+          tplReminder: document.getElementById('tplReminder').value
+        };
+      }
+
+      function renderScheduledMailPreview() {
+        if (!parsedRecords.length) {
+          alert('先に貸出データを読み込んでください。');
+          return;
+        }
+        let settings = collectCurrentSettings();
+        if (!settings) return;
+
+        const payload = { records: parsedRecords, settings: settings };
+        document.getElementById('loader').style.display = 'inline';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            drawPreviewTable(result.rows || []);
+            document.getElementById('loader').style.display = 'none';
+          })
+          .withFailureHandler(function(err) {
+            alert('プレビュー生成エラー: ' + err.message);
+            document.getElementById('loader').style.display = 'none';
+          })
+          .getScheduledPreview(payload);
+      }
+
+      function drawPreviewTable(rows) {
+        const tbody = document.querySelector('#previewTable tbody');
+        const summary = document.getElementById('previewSummary');
+        tbody.innerHTML = '';
+        summary.innerText = `一覧件数: ${rows.length}件（1行1件で全件表示）`;
+        rows.forEach(r => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.status || ''}</td>
+            <td>${r.category || ''}</td>
+            <td>${r.id || ''}</td>
+            <td>${r.rosterName || ''}</td>
+            <td>${r.borrowerName || ''}</td>
+            <td>${r.recipientName || ''}</td>
+            <td>${r.email || ''}</td>
+            <td>${r.classInfo || ''}</td>
+            <td>${r.title || ''}</td>
+            <td>${r.borrowDate || ''}</td>
+            <td>${r.dueDate || ''}</td>
+            <td>${r.warning || ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
       }
     </script>
   </body>
