@@ -177,15 +177,31 @@ function parseRuleDate(dateStr) {
   return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
 }
 
+function parseDateMs(dateStr) {
+  let parts = String(dateStr || "").split(/[\/\-]/);
+  if (parts.length < 3) return null;
+  let y = parseInt(parts[0], 10);
+  let m = parseInt(parts[1], 10);
+  let d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  return new Date(y, m - 1, d).getTime();
+}
+
 function getRuleNendoLabel(rule) {
   if (!rule || !rule.start) return "";
   let nendo = getNendoFromDateStr(rule.start);
   return nendo != null ? `${nendo}年度` : "";
 }
 
-// 指定基準日の名簿ルールを取得（期間一致のみ）
-function findRulesForTargetDate(rules, bDate, dDate) {
-  let matched = [];
+// 1件の貸出データに対して適用ルールを解決
+function resolveRuleForRecord(rules, borrowDateStr, dueDateStr) {
+  const bDate = parseDateMs(borrowDateStr);
+  const dDate = parseDateMs(dueDateStr);
+  if (bDate === null || dDate === null) {
+    return { error: "日付形式不正", matchedRules: [] };
+  }
+
+  let matchedRules = [];
   for (let i = 0; i < rules.length; i++) {
     let rule = rules[i];
     let dateType = rule.dateType || "borrow";
@@ -194,10 +210,14 @@ function findRulesForTargetDate(rules, bDate, dDate) {
     let end = parseRuleDate(rule.end);
     end.setHours(23, 59, 59, 999);
     if (targetDate >= start && targetDate <= end.getTime()) {
-      matched.push({ rule, start });
+      matchedRules.push(rule);
     }
   }
-  return matched.map(x => x.rule);
+
+  if (matchedRules.length > 1) {
+    return { error: "名簿ルール重複", matchedRules };
+  }
+  return { rule: matchedRules[0] || null, bDate, dDate, matchedRules };
 }
 
 // ルールに基づいて特定シートの名簿Mapを生成する（学年・組・番号の4桁IDで照合）
@@ -250,18 +270,15 @@ function buildMailPlan(records, settings, rules) {
   records.forEach(r => {
     let isStaff = !r.classInfo.match(/(中学|高校)/);
     let borrowNendo = getNendoFromDateStr(r.borrowDate);
-    let currentId = normalizeTo4DigitId(r.classInfo, r.name);
-    let lookupId = currentId;
+    let lookupId = normalizeTo4DigitId(r.classInfo, r.name);
     r.id = lookupId;
-
-    let bDateParts = r.borrowDate.split('/');
-    let bDate = new Date(bDateParts[0], bDateParts[1] - 1, bDateParts[2]).getTime();
-    let dDateParts = r.dueDate.split('/');
 
     let email = "";
     let rosterName = "";
     let ruleMatched = false;
     let matchedRule = null;
+    let matchError = "";
+    let resolved = resolveRuleForRecord(rules, r.borrowDate, r.dueDate);
 
     if (isStaff) {
       if (!rosterCache['STAFF']) rosterCache['STAFF'] = loadStaffRosterMaps();
@@ -270,12 +287,10 @@ function buildMailPlan(records, settings, rules) {
       rosterName = staffInfo.name || r.name;
       ruleMatched = true;
     } else {
-      let matchedRules = findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime());
-      if (matchedRules.length > 1) {
-        ruleMatched = false;
-        matchedRule = null;
-      } else if (matchedRules.length === 1) {
-        matchedRule = matchedRules[0];
+      if (resolved.error) {
+        matchError = resolved.error;
+      } else if (resolved.rule) {
+        matchedRule = resolved.rule;
         ruleMatched = true;
         let cacheKey = matchedRule.sheetName;
         if (!rosterCache[cacheKey]) {
@@ -294,9 +309,8 @@ function buildMailPlan(records, settings, rules) {
                     (r.classInfo.includes("高校") && String(settings.sendH) === "true") ||
                     (isStaff && String(settings.sendStaff) === "true");
 
-    let dueDateObj = new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]);
-    dueDateObj.setHours(0, 0, 0, 0);
-    let isOverdue = dueDateObj < today;
+    let dueMs = parseDateMs(r.dueDate);
+    let isOverdue = dueMs !== null && dueMs < today.getTime();
 
     if (isOverdue) {
       let status = "";
@@ -304,12 +318,15 @@ function buildMailPlan(records, settings, rules) {
       if (!isAllowed) {
         status = "対象外";
         statusDetail = "送信設定オフ";
-      } else if (!isStaff && findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime()).length > 1) {
+      } else if (!isStaff && matchError === "名簿ルール重複") {
         status = "送信不可";
         statusDetail = "名簿ルール重複";
+      } else if (!isStaff && matchError === "日付形式不正") {
+        status = "送信不可";
+        statusDetail = "日付形式不正";
       } else if (!ruleMatched) {
         status = "送信不可";
-        statusDetail = borrowNendo + "年度の名簿ルールなし";
+        statusDetail = "名簿ルールなし";
       } else if (!email) {
         status = "送信不可";
         statusDetail = isStaff ? "メール未登録" : "学年・組・番未一致";
@@ -344,12 +361,14 @@ function buildMailPlan(records, settings, rules) {
     if (!email) {
       if (isStaff) {
         missingEmails.add(`教職員: ${r.name} (プレビュー画面の氏名をクリックして登録可能)`);
-      } else if (findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime()).length > 1) {
+      } else if (matchError === "名簿ルール重複") {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対して名簿ルールが重複しています。期間設定を見直してください)`);
+      } else if (matchError === "日付形式不正") {
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日または返却日の形式が不正です: 貸出=${r.borrowDate}, 返却=${r.dueDate})`);
       } else if (!ruleMatched) {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate}＝${borrowNendo}年度に対応する名簿ルールがありません)`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対応する名簿ルールがありません)`);
       } else {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」に照合ID[${lookupId}]が見つかりません。現在表示=${currentId})`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」に照合ID[${lookupId}]が見つかりません)`);
       }
     }
 
