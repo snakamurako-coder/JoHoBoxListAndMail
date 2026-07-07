@@ -834,6 +834,22 @@
           refreshRosterEditorUi(rosterConfigsUi.length - 1);
         } else {
           const idx = Number(selected || 0);
+          const currentName = String((rosterConfigsUi[idx] && rosterConfigsUi[idx].name) || '').trim();
+          let nextName = currentName;
+          const shouldRename = confirm(`名簿名を変更しますか？\n現在: ${currentName || '(未設定)'}`);
+          if (shouldRename) {
+            const inputName = prompt('新しい名簿名を入力してください', currentName || `${row.startYear || rosterMeta.currentYear}年度名簿`);
+            if (inputName === null) {
+              document.getElementById('rosterSaveStatus').innerText = '名簿名の変更をキャンセルしました。';
+              return;
+            }
+            nextName = String(inputName || '').trim();
+            if (!nextName) {
+              alert('名簿名は空欄にできません。');
+              return;
+            }
+          }
+          row.name = nextName;
           rosterConfigsUi[idx] = row;
           refreshRosterEditorUi(idx);
         }
