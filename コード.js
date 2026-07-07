@@ -286,16 +286,15 @@ function getRosterMapsForRule(rule) {
   return { byId };
 }
 
-// 名簿からメールアドレスを照合（貸出年度の名簿を学年・組・番号の4桁IDで照合）
-function lookupInRoster(maps, id, sourceSheet) {
+// 名簿からメールアドレスを照合（参照名簿のIDで照合）
+function lookupInRoster(maps, id) {
   if (id && maps.byId[id]) {
     return {
       email: maps.byId[id].email || "",
-      rosterName: maps.byId[id].rosterName || "",
-      sourceSheet: sourceSheet || ""
+      rosterName: maps.byId[id].rosterName || ""
     };
   }
-  return { email: "", rosterName: "", sourceSheet: sourceSheet || "" };
+  return { email: "", rosterName: "" };
 }
 
 function buildMailPlan(records, settings, rules) {
@@ -317,7 +316,6 @@ function buildMailPlan(records, settings, rules) {
 
     let email = "";
     let rosterName = "";
-    let resolvedSheet = "";
     let ruleMatched = false;
     let matchedRule = null;
     let matchError = "";
@@ -328,26 +326,21 @@ function buildMailPlan(records, settings, rules) {
       let staffInfo = rosterCache['STAFF'][lookupId] || { email: "", name: "" };
       email = staffInfo.email || "";
       rosterName = staffInfo.name || r.name;
-      resolvedSheet = "教職員名簿";
       ruleMatched = true;
     } else {
       if (resolved.error) {
         matchError = resolved.error;
       } else if (resolved.rule) {
         matchedRule = resolved.rule;
-        resolvedSheet = matchedRule.sheetName;
         ruleMatched = true;
         let cacheKey = matchedRule.sheetName;
         if (!rosterCache[cacheKey]) {
           let maps = getRosterMapsForRule(matchedRule);
           rosterCache[cacheKey] = maps !== null ? maps : { byId: {} };
         }
-        let found = lookupInRoster(rosterCache[cacheKey], lookupId, cacheKey);
-        // 参照名簿と同一ソース由来のデータのみ採用する
-        if (found.sourceSheet === resolvedSheet) {
-          email = found.email;
-          rosterName = found.rosterName || "";
-        }
+        let found = lookupInRoster(rosterCache[cacheKey], lookupId);
+        email = found.email;
+        rosterName = found.rosterName || "";
       }
     }
 
@@ -395,7 +388,7 @@ function buildMailPlan(records, settings, rules) {
         borrowDate: borrowDateNorm || r.borrowDate,
         dueDate: dueDateNorm || r.dueDate,
         nendo: borrowNendo != null ? String(borrowNendo) : (r.nendo || ""),
-        rosterSheet: resolvedSheet,
+        rosterSheet: isStaff ? "教職員名簿" : (matchedRule ? matchedRule.sheetName : ""),
         rosterNendo: isStaff ? "教職員" : (matchedRule ? getRuleNendoLabel(matchedRule) : ""),
         id: lookupId,
         isStaff: isStaff,
