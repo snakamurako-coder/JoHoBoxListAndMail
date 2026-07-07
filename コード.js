@@ -175,6 +175,20 @@ function normalizeDateString(input) {
   const raw = String(input).trim();
   if (!raw) return "";
 
+  // Excel/Sheets の日付シリアル値を受け取った場合
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const serial = Number(raw);
+    if (!isNaN(serial) && serial > 20000 && serial < 100000) {
+      const excelEpoch = new Date(1899, 11, 30);
+      const ms = excelEpoch.getTime() + Math.floor(serial) * 86400000;
+      const d = new Date(ms);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}/${m}/${day}`;
+    }
+  }
+
   // "2026年4月9日", "2026.4.9", "2026-04-09", "2026/4/9" を統一
   const replaced = raw
     .replace(/[年月]/g, "/")
@@ -206,6 +220,7 @@ function getNendoFromDateStr(dateStr) {
 
 function parseRuleDate(dateStr) {
   const ms = parseDateMs(dateStr);
+  if (ms === null) return null;
   return new Date(ms);
 }
 
@@ -236,12 +251,18 @@ function resolveRuleForRecord(rules, borrowDateStr, dueDateStr) {
   }
 
   let matchedRules = [];
+  let invalidRuleFound = false;
   for (let i = 0; i < rules.length; i++) {
     let rule = rules[i];
     let dateType = rule.dateType || "borrow";
     let targetDate = dateType === "due" ? dDate : bDate;
-    let start = parseRuleDate(rule.start).getTime();
+    let startObj = parseRuleDate(rule.start);
     let end = parseRuleDate(rule.end);
+    if (!startObj || !end || isNaN(startObj.getTime()) || isNaN(end.getTime())) {
+      invalidRuleFound = true;
+      continue;
+    }
+    let start = startObj.getTime();
     end.setHours(23, 59, 59, 999);
     if (targetDate >= start && targetDate <= end.getTime()) {
       matchedRules.push(rule);
@@ -250,6 +271,9 @@ function resolveRuleForRecord(rules, borrowDateStr, dueDateStr) {
 
   if (matchedRules.length > 1) {
     return { error: "名簿ルール重複", matchedRules };
+  }
+  if (invalidRuleFound && matchedRules.length === 0) {
+    return { error: "ルール日付不正", matchedRules: [] };
   }
   return { rule: matchedRules[0] || null, bDate, dDate, matchedRules };
 }
@@ -365,6 +389,9 @@ function buildMailPlan(records, settings, rules) {
       } else if (!isStaff && matchError === "日付形式不正") {
         status = "送信不可";
         statusDetail = "日付形式不正";
+      } else if (!isStaff && matchError === "ルール日付不正") {
+        status = "送信不可";
+        statusDetail = "ルール日付不正";
       } else if (!ruleMatched) {
         status = "送信不可";
         statusDetail = "名簿ルールなし";
@@ -405,6 +432,8 @@ function buildMailPlan(records, settings, rules) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対して名簿ルールが重複しています。期間設定を見直してください)`);
       } else if (matchError === "日付形式不正") {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日または返却日の形式が不正です: 貸出=${r.borrowDate}, 返却=${r.dueDate})`);
+      } else if (matchError === "ルール日付不正") {
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿ルールの開始日/終了日に不正な値があります。ルール設定を確認してください)`);
       } else if (!ruleMatched) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${borrowDateNorm || r.borrowDate} に対応する名簿ルールがありません)`);
       } else {
