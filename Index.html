@@ -43,6 +43,10 @@
       .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
       .preview-table th, .preview-table td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
       .preview-table th { background: #eef3f7; white-space: nowrap; }
+      .roster-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+      .roster-table th, .roster-table td { border: 1px solid #ddd; padding: 6px; }
+      .roster-table input { width: 100%; box-sizing: border-box; padding: 4px; }
+      .sortable { cursor: pointer; user-select: none; }
 
       @media print {
         body * { visibility: hidden; }
@@ -75,11 +79,38 @@
           </div>
         </div>
         <div style="margin-top: 10px;">
-          <label style="display:block; font-size:13px; font-weight:bold; margin-bottom:5px;">名簿設定（JSON）</label>
-          <textarea id="rosterConfigs" style="height: 160px;"></textarea>
+          <label style="display:block; font-size:13px; font-weight:bold; margin-bottom:5px;">名簿設定（UI登録）</label>
+          <div style="margin-bottom:8px;">
+            <button type="button" class="btn btn-primary" style="padding:6px 10px; font-size:12px;" onclick="addRosterRow()">名簿を追加</button>
+            <button type="button" class="btn btn-success" style="padding:6px 10px; font-size:12px; margin-left:8px;" onclick="saveRosterConfigs()">名簿設定を保存</button>
+            <span id="rosterSaveStatus" style="font-size:12px; margin-left:8px; color:#666;"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="roster-table" id="rosterTable">
+              <thead>
+                <tr>
+                  <th>名簿名</th>
+                  <th>シートタブ</th>
+                  <th>見出し行</th>
+                  <th>ID方式</th>
+                  <th>4桁ID見出し</th>
+                  <th>学年見出し</th>
+                  <th>組見出し</th>
+                  <th>番号見出し</th>
+                  <th>氏名見出し</th>
+                  <th>メール見出し</th>
+                  <th>開始西暦</th>
+                  <th>開始日</th>
+                  <th>終了日</th>
+                  <th>削除</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
           <div class="vars-help">
             例: 2026年度なら startDate=2026/04/01, endDate=2027/03/31 を設定<br>
-            <span>名簿はコンテナバインド先SSの新シートとして登録し、名簿設定シート(name,sheetName,startDate,endDate,idCol,emailCol...)を優先参照します。</span>
+            <span>名簿はコンテナバインド先SSの新シートとして登録し、このUIから期間と列番号を保存します。</span>
           </div>
         </div>
       </div>
@@ -132,18 +163,18 @@
           <table class="preview-table" id="previewTable">
             <thead>
               <tr>
-                <th>判定</th>
-                <th>区分</th>
-                <th>4桁ID</th>
-                <th>名簿名</th>
-                <th>借用者氏名</th>
-                <th>送信先氏名</th>
-                <th>メール</th>
-                <th>クラス</th>
-                <th>書籍名</th>
-                <th>貸出日</th>
-                <th>返却日</th>
-                <th>警告</th>
+                <th class="sortable" data-sort-key="status">判定</th>
+                <th class="sortable" data-sort-key="category">区分</th>
+                <th class="sortable" data-sort-key="id">4桁ID</th>
+                <th class="sortable" data-sort-key="rosterName">名簿名</th>
+                <th class="sortable" data-sort-key="borrowerName">借用者氏名</th>
+                <th class="sortable" data-sort-key="recipientName">送信先氏名</th>
+                <th class="sortable" data-sort-key="email">メール</th>
+                <th class="sortable" data-sort-key="classInfo">クラス</th>
+                <th class="sortable" data-sort-key="title">書籍名</th>
+                <th class="sortable" data-sort-key="borrowDate">貸出日</th>
+                <th class="sortable" data-sort-key="dueDate">返却日</th>
+                <th class="sortable" data-sort-key="warning">警告</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -158,31 +189,20 @@
 
     <script>
       let parsedRecords = [];
+      let previewRows = [];
+      let sortState = { key: "", asc: true };
+      let rosterConfigsUi = [];
+      let rosterMeta = { sheetNames: [], currentYear: new Date().getFullYear() };
+      let headerCache = {};
       const defSubOverdue = "【図書室】未返却図書のお知らせ";
       const defTplOverdue = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書が返却期限を過ぎております。\n\n【書籍名】\n\n速やかにご返却ください。";
       const defSubReminder = "【図書室】返却期限間近のお知らせ";
       const defTplReminder = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
-      const defRosterConfigs = JSON.stringify([
-        {
-          name: "2026年度名簿",
-          sheetName: "連絡先_2026",
-          startDate: "2026/04/01",
-          endDate: "2027/03/31",
-          idCol: 1,
-          emailCol: 2,
-          categoryCol: 3,
-          nameCol: 4
-        }
-      ], null, 2);
-
       function applySettings(s) {
         if (s.rosterDateBase === "dueDate") {
           document.getElementById('rosterDateBaseDue').checked = true;
         } else {
           document.getElementById('rosterDateBaseBorrow').checked = true;
-        }
-        if (s.rosterConfigs) {
-          document.getElementById('rosterConfigs').value = s.rosterConfigs;
         }
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
@@ -196,11 +216,12 @@
 
       window.onload = function() {
         document.getElementById('rosterDateBaseBorrow').checked = true;
-        document.getElementById('rosterConfigs').value = defRosterConfigs;
         document.getElementById('subOverdue').value = defSubOverdue;
         document.getElementById('tplOverdue').value = defTplOverdue;
         document.getElementById('subReminder').value = defSubReminder;
         document.getElementById('tplReminder').value = defTplReminder;
+        bindSortEvents();
+        loadRosterMetaAndConfigs();
 
         let localSettings = localStorage.getItem('v7_settings');
         if (localSettings) {
@@ -452,22 +473,15 @@
       }
 
       function collectCurrentSettings() {
-        let rosterConfigsRaw = document.getElementById('rosterConfigs').value.trim();
-        let rosterConfigsParsed;
-        try {
-          rosterConfigsParsed = JSON.parse(rosterConfigsRaw || "[]");
-          if (!Array.isArray(rosterConfigsParsed) || rosterConfigsParsed.length === 0) {
-            alert('名簿設定（JSON）に1件以上の設定が必要です。');
-            return null;
-          }
-        } catch (e) {
-          alert('名簿設定（JSON）の形式が不正です。\n' + e.message);
+        const rosterConfigs = collectRosterConfigsFromTable();
+        if (!rosterConfigs.length) {
+          alert('名簿設定を1件以上登録してください。');
           return null;
         }
 
         return {
           rosterDateBase: document.querySelector('input[name="rosterDateBase"]:checked').value,
-          rosterConfigs: JSON.stringify(rosterConfigsParsed),
+          rosterConfigs: JSON.stringify(rosterConfigs),
           sendJ: document.getElementById('sendJ').checked,
           sendH: document.getElementById('sendH').checked,
           sendStaff: document.getElementById('sendStaff').checked,
@@ -502,9 +516,15 @@
       }
 
       function drawPreviewTable(rows) {
+        previewRows = rows.slice();
+        renderSortedPreviewRows();
+      }
+
+      function renderSortedPreviewRows() {
         const tbody = document.querySelector('#previewTable tbody');
         const summary = document.getElementById('previewSummary');
         tbody.innerHTML = '';
+        const rows = sortPreviewRows(previewRows);
         summary.innerText = `一覧件数: ${rows.length}件（1行1件で全件表示）`;
         rows.forEach(r => {
           let tr = document.createElement('tr');
@@ -524,6 +544,265 @@
           `;
           tbody.appendChild(tr);
         });
+      }
+
+      function bindSortEvents() {
+        document.querySelectorAll('#previewTable th.sortable').forEach(th => {
+          th.addEventListener('click', function() {
+            const key = th.getAttribute('data-sort-key');
+            if (sortState.key === key) {
+              sortState.asc = !sortState.asc;
+            } else {
+              sortState.key = key;
+              sortState.asc = true;
+            }
+            renderSortedPreviewRows();
+          });
+        });
+      }
+
+      function sortPreviewRows(rows) {
+        if (!sortState.key) return rows;
+        const key = sortState.key;
+        const asc = sortState.asc ? 1 : -1;
+        return rows.slice().sort((a, b) => {
+          const av = String(a[key] || "");
+          const bv = String(b[key] || "");
+          return av.localeCompare(bv, 'ja') * asc;
+        });
+      }
+
+      function loadRosterMetaAndConfigs() {
+        google.script.run
+          .withSuccessHandler(function(meta) {
+            rosterMeta = meta || rosterMeta;
+            loadRosterConfigs();
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('rosterSaveStatus').innerText = '名簿メタ情報読込エラー: ' + err.message;
+          })
+          .getRosterUiMeta();
+      }
+
+      function loadRosterConfigs() {
+        google.script.run
+          .withSuccessHandler(function(configs) {
+            rosterConfigsUi = Array.isArray(configs) ? configs : [];
+            if (!rosterConfigsUi.length) {
+              rosterConfigsUi = [buildDefaultRosterRow()];
+            }
+            renderRosterTable();
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('rosterSaveStatus').innerText = '名簿設定読込エラー: ' + err.message;
+          })
+          .getRosterConfigsForUi();
+      }
+
+      function buildDefaultRosterRow() {
+        const y = Number(rosterMeta.currentYear || new Date().getFullYear());
+        return {
+          name: `${y}年度名簿`,
+          sheetName: (rosterMeta.sheetNames && rosterMeta.sheetNames[0]) || "",
+          headerRow: 1,
+          idMode: "direct",
+          idHeader: "",
+          gradeHeader: "",
+          classHeader: "",
+          numberHeader: "",
+          nameHeader: "",
+          emailHeader: "",
+          categoryHeader: "",
+          startYear: y,
+          startDate: `${y}/04/01`,
+          endDate: `${y + 1}/03/31`
+        };
+      }
+
+      function renderRosterTable() {
+        const tbody = document.querySelector('#rosterTable tbody');
+        tbody.innerHTML = '';
+        rosterConfigsUi.forEach((c, idx) => {
+          const y = Number(c.startYear || rosterMeta.currentYear || new Date().getFullYear());
+          const startDate = c.startDate || `${y}/04/01`;
+          const endDate = c.endDate || `${y + 1}/03/31`;
+          const sheetOptions = (rosterMeta.sheetNames || []).map(name => `<option value="${escapeHtml(name)}" ${name === c.sheetName ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><input type="text" data-k="name" value="${escapeHtml(c.name || '')}"></td>
+            <td><select data-k="sheetName" onchange="onRosterSheetOrHeaderChanged(${idx})">${sheetOptions}</select></td>
+            <td><input type="number" data-k="headerRow" value="${escapeHtml(c.headerRow || 1)}" min="1" onchange="onRosterSheetOrHeaderChanged(${idx})"></td>
+            <td>
+              <select data-k="idMode" onchange="toggleIdModeFields(${idx})">
+                <option value="direct" ${c.idMode === "direct" ? "selected" : ""}>4桁ID直接</option>
+                <option value="parts" ${c.idMode === "parts" ? "selected" : ""}>学年・組・番号から生成</option>
+              </select>
+            </td>
+            <td><select data-k="idHeader"></select></td>
+            <td><select data-k="gradeHeader"></select></td>
+            <td><select data-k="classHeader"></select></td>
+            <td><select data-k="numberHeader"></select></td>
+            <td><select data-k="nameHeader"></select></td>
+            <td><select data-k="emailHeader"></select></td>
+            <td><input type="number" data-k="startYear" value="${escapeHtml(y)}" min="2000" max="2100" onchange="onStartYearChanged(this)"></td>
+            <td><input type="text" data-k="startDate" value="${escapeHtml(startDate)}" readonly></td>
+            <td><input type="text" data-k="endDate" value="${escapeHtml(endDate)}" readonly></td>
+            <td><button type="button" onclick="removeRosterRow(${idx})">削除</button></td>
+          `;
+          tbody.appendChild(tr);
+          updateHeaderSelectsForRow(tr, c, idx);
+          toggleIdModeFields(idx);
+        });
+      }
+
+      function collectRosterConfigsFromTable() {
+        const rows = [];
+        document.querySelectorAll('#rosterTable tbody tr').forEach(tr => {
+          const getValue = (k) => {
+            const el = tr.querySelector(`[data-k="${k}"]`);
+            return el ? el.value.trim() : "";
+          };
+          const row = {
+            name: getValue('name'),
+            sheetName: getValue('sheetName'),
+            headerRow: getValue('headerRow') || "1",
+            idMode: getValue('idMode') || "direct",
+            idHeader: getValue('idHeader'),
+            gradeHeader: getValue('gradeHeader'),
+            classHeader: getValue('classHeader'),
+            numberHeader: getValue('numberHeader'),
+            nameHeader: getValue('nameHeader'),
+            emailHeader: getValue('emailHeader'),
+            categoryHeader: "",
+            startYear: getValue('startYear'),
+            startDate: getValue('startDate'),
+            endDate: getValue('endDate')
+          };
+          if (row.sheetName || row.startDate || row.endDate || row.emailHeader) {
+            rows.push(row);
+          }
+        });
+        return rows;
+      }
+
+      function addRosterRow() {
+        rosterConfigsUi.push(buildDefaultRosterRow());
+        renderRosterTable();
+      }
+
+      function removeRosterRow(index) {
+        rosterConfigsUi.splice(index, 1);
+        renderRosterTable();
+      }
+
+      function saveRosterConfigs() {
+        const rows = collectRosterConfigsFromTable();
+        if (!rows.length) {
+          alert('保存する名簿設定がありません。');
+          return;
+        }
+        document.getElementById('rosterSaveStatus').innerText = '保存中...';
+        google.script.run
+          .withSuccessHandler(function(msg) {
+            document.getElementById('rosterSaveStatus').innerText = msg;
+            rosterConfigsUi = rows;
+            renderRosterTable();
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('rosterSaveStatus').innerText = '保存エラー: ' + err.message;
+          })
+          .saveRosterConfigsFromUi(rows);
+      }
+
+      function onStartYearChanged(input) {
+        const tr = input.closest('tr');
+        const y = Number(input.value || rosterMeta.currentYear || new Date().getFullYear());
+        tr.querySelector('[data-k="startDate"]').value = `${y}/04/01`;
+        tr.querySelector('[data-k="endDate"]').value = `${y + 1}/03/31`;
+      }
+
+      function onRosterSheetOrHeaderChanged(index) {
+        const tr = document.querySelectorAll('#rosterTable tbody tr')[index];
+        if (!tr) return;
+        const current = collectRowConfig(tr);
+        updateHeaderSelectsForRow(tr, current, index);
+      }
+
+      function toggleIdModeFields(index) {
+        const tr = document.querySelectorAll('#rosterTable tbody tr')[index];
+        if (!tr) return;
+        const mode = tr.querySelector('[data-k="idMode"]').value;
+        const setDisabled = (key, disabled) => {
+          const el = tr.querySelector(`[data-k="${key}"]`);
+          if (el) el.disabled = disabled;
+        };
+        setDisabled('idHeader', mode !== 'direct');
+        setDisabled('gradeHeader', mode !== 'parts');
+        setDisabled('classHeader', mode !== 'parts');
+        setDisabled('numberHeader', mode !== 'parts');
+      }
+
+      function collectRowConfig(tr) {
+        const getValue = (k) => {
+          const el = tr.querySelector(`[data-k="${k}"]`);
+          return el ? el.value.trim() : "";
+        };
+        return {
+          sheetName: getValue('sheetName'),
+          headerRow: getValue('headerRow'),
+          idMode: getValue('idMode'),
+          idHeader: getValue('idHeader'),
+          gradeHeader: getValue('gradeHeader'),
+          classHeader: getValue('classHeader'),
+          numberHeader: getValue('numberHeader'),
+          nameHeader: getValue('nameHeader'),
+          emailHeader: getValue('emailHeader')
+        };
+      }
+
+      function updateHeaderSelectsForRow(tr, config, index) {
+        const sheetName = config.sheetName;
+        const headerRow = Number(config.headerRow || 1);
+        if (!sheetName) return;
+        const cacheKey = `${sheetName}|${headerRow}`;
+        if (headerCache[cacheKey]) {
+          applyHeaderOptions(tr, headerCache[cacheKey], config);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function(headers) {
+            headerCache[cacheKey] = headers || [];
+            applyHeaderOptions(tr, headerCache[cacheKey], config);
+            toggleIdModeFields(index);
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('rosterSaveStatus').innerText = '見出し読込エラー: ' + err.message;
+          })
+          .getSheetHeadersForUi(sheetName, headerRow);
+      }
+
+      function applyHeaderOptions(tr, headers, config) {
+        const fill = (key, selected) => {
+          const el = tr.querySelector(`[data-k="${key}"]`);
+          if (!el) return;
+          const opts = ['<option value=""></option>'].concat(headers.map(h => `<option value="${escapeHtml(h)}" ${h === selected ? 'selected' : ''}>${escapeHtml(h)}</option>`));
+          el.innerHTML = opts.join('');
+        };
+        fill('idHeader', config.idHeader || "");
+        fill('gradeHeader', config.gradeHeader || "");
+        fill('classHeader', config.classHeader || "");
+        fill('numberHeader', config.numberHeader || "");
+        fill('nameHeader', config.nameHeader || "");
+        fill('emailHeader', config.emailHeader || "");
+      }
+
+      function escapeHtml(text) {
+        return String(text || "")
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
     </script>
   </body>

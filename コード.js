@@ -58,23 +58,74 @@ function normalizeCategory(raw) {
   return value;
 }
 
+function normalizeRoster4DigitId(raw) {
+  return String(raw || "").trim();
+}
+
+function build4DigitIdFromParts(grade, classCode, numberValue) {
+  const g = String(grade || "").trim();
+  const c = String(classCode || "").trim();
+  const n = String(numberValue || "").trim();
+  if (!g || !c || !n) return "";
+  const n2 = String(parseInt(n, 10));
+  if (n2 === "NaN") return "";
+  return `${g}${c}${n2.padStart(2, "0")}`;
+}
+
+function getHeaderIndexMap(headers) {
+  const map = {};
+  headers.forEach((h, i) => {
+    const key = String(h || "").trim();
+    if (key) map[key] = i;
+  });
+  return map;
+}
+
 function buildRosterContactMap(rosterConfig) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(rosterConfig.sheetName);
   if (!sheet) return {};
   
   const data = sheet.getDataRange().getValues();
+  const headerRow = Math.max(1, parseInt(rosterConfig.headerRow || 1, 10));
+  if (data.length < headerRow) return {};
+  const headers = data[headerRow - 1];
+  const idxMap = getHeaderIndexMap(headers);
+
   let map = {};
-  let idCol = parseInt(rosterConfig.idCol, 10) - 1;
-  let emailCol = parseInt(rosterConfig.emailCol, 10) - 1;
-  let categoryCol = rosterConfig.categoryCol ? parseInt(rosterConfig.categoryCol, 10) - 1 : -1;
-  let nameCol = rosterConfig.nameCol ? parseInt(rosterConfig.nameCol, 10) - 1 : -1;
+  const mode = rosterConfig.idMode === "parts" ? "parts" : "direct";
+  const idHeader = String(rosterConfig.idHeader || "").trim();
+  const gradeHeader = String(rosterConfig.gradeHeader || "").trim();
+  const classHeader = String(rosterConfig.classHeader || "").trim();
+  const numberHeader = String(rosterConfig.numberHeader || "").trim();
+  const nameHeader = String(rosterConfig.nameHeader || "").trim();
+  const emailHeader = String(rosterConfig.emailHeader || "").trim();
+  const categoryHeader = String(rosterConfig.categoryHeader || "").trim();
+  const emailCol = idxMap[emailHeader];
+  const nameCol = nameHeader ? idxMap[nameHeader] : undefined;
+  const categoryCol = categoryHeader ? idxMap[categoryHeader] : undefined;
+  const idCol = idHeader ? idxMap[idHeader] : undefined;
+  const gradeCol = gradeHeader ? idxMap[gradeHeader] : undefined;
+  const classCol = classHeader ? idxMap[classHeader] : undefined;
+  const numberCol = numberHeader ? idxMap[numberHeader] : undefined;
   
-  for (let i = 1; i < data.length; i++) {
-    let id = String(data[i][idCol]).trim();
-    let email = String(data[i][emailCol]).trim();
-    let category = categoryCol >= 0 ? normalizeCategory(data[i][categoryCol]) : "";
-    let studentName = nameCol >= 0 ? String(data[i][nameCol]).trim() : "";
+  if (emailCol === undefined) return {};
+
+  for (let i = headerRow; i < data.length; i++) {
+    let row = data[i];
+    let id = "";
+    if (mode === "parts") {
+      id = build4DigitIdFromParts(
+        gradeCol === undefined ? "" : row[gradeCol],
+        classCol === undefined ? "" : row[classCol],
+        numberCol === undefined ? "" : row[numberCol]
+      );
+    } else {
+      id = normalizeRoster4DigitId(idCol === undefined ? "" : row[idCol]);
+    }
+    let email = String(row[emailCol] || "").trim();
+    let category = categoryCol === undefined ? "" : normalizeCategory(row[categoryCol]);
+    let studentName = nameCol === undefined ? "" : String(row[nameCol] || "").trim();
     if (!id || !email) continue;
 
     map[id] = { email: email, name: studentName, category: category };
@@ -128,13 +179,19 @@ function loadRosterConfigsFromSheet() {
     sheetName: headers.indexOf("sheetName"),
     startDate: headers.indexOf("startDate"),
     endDate: headers.indexOf("endDate"),
-    idCol: headers.indexOf("idCol"),
-    emailCol: headers.indexOf("emailCol"),
-    categoryCol: headers.indexOf("categoryCol"),
-    nameCol: headers.indexOf("nameCol")
+    startYear: headers.indexOf("startYear"),
+    headerRow: headers.indexOf("headerRow"),
+    idMode: headers.indexOf("idMode"),
+    idHeader: headers.indexOf("idHeader"),
+    gradeHeader: headers.indexOf("gradeHeader"),
+    classHeader: headers.indexOf("classHeader"),
+    numberHeader: headers.indexOf("numberHeader"),
+    nameHeader: headers.indexOf("nameHeader"),
+    emailHeader: headers.indexOf("emailHeader"),
+    categoryHeader: headers.indexOf("categoryHeader")
   };
-  if (idx.name < 0 || idx.sheetName < 0 || idx.startDate < 0 || idx.endDate < 0 || idx.idCol < 0 || idx.emailCol < 0) {
-    throw new Error("名簿設定シートのヘッダーが不足しています。name,sheetName,startDate,endDate,idCol,emailCol を用意してください。");
+  if (idx.name < 0 || idx.sheetName < 0 || idx.startDate < 0 || idx.endDate < 0 || idx.idMode < 0 || idx.emailHeader < 0) {
+    throw new Error("名簿設定シートのヘッダーが不足しています。最新版のUIで名簿設定を保存し直してください。");
   }
 
   const result = [];
@@ -147,10 +204,16 @@ function loadRosterConfigsFromSheet() {
       sheetName: sheetName,
       startDate: String(row[idx.startDate] || "").trim(),
       endDate: String(row[idx.endDate] || "").trim(),
-      idCol: Number(row[idx.idCol]),
-      emailCol: Number(row[idx.emailCol]),
-      categoryCol: idx.categoryCol >= 0 && row[idx.categoryCol] !== "" ? Number(row[idx.categoryCol]) : undefined,
-      nameCol: idx.nameCol >= 0 && row[idx.nameCol] !== "" ? Number(row[idx.nameCol]) : undefined
+      startYear: idx.startYear >= 0 ? Number(row[idx.startYear]) : undefined,
+      headerRow: idx.headerRow >= 0 && row[idx.headerRow] !== "" ? Number(row[idx.headerRow]) : 1,
+      idMode: String(row[idx.idMode] || "direct").trim(),
+      idHeader: idx.idHeader >= 0 ? String(row[idx.idHeader] || "").trim() : "",
+      gradeHeader: idx.gradeHeader >= 0 ? String(row[idx.gradeHeader] || "").trim() : "",
+      classHeader: idx.classHeader >= 0 ? String(row[idx.classHeader] || "").trim() : "",
+      numberHeader: idx.numberHeader >= 0 ? String(row[idx.numberHeader] || "").trim() : "",
+      nameHeader: idx.nameHeader >= 0 ? String(row[idx.nameHeader] || "").trim() : "",
+      emailHeader: idx.emailHeader >= 0 ? String(row[idx.emailHeader] || "").trim() : "",
+      categoryHeader: idx.categoryHeader >= 0 ? String(row[idx.categoryHeader] || "").trim() : ""
     });
   }
   return result;
@@ -161,15 +224,87 @@ function setupRosterConfigSheet() {
   let sheet = ss.getSheetByName("名簿設定");
   if (!sheet) sheet = ss.insertSheet("名簿設定");
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["name", "sheetName", "startDate", "endDate", "idCol", "emailCol", "categoryCol", "nameCol"]);
+    sheet.appendRow(["name", "sheetName", "startYear", "startDate", "endDate", "headerRow", "idMode", "idHeader", "gradeHeader", "classHeader", "numberHeader", "nameHeader", "emailHeader", "categoryHeader"]);
   } else if (sheet.getLastRow() >= 1) {
     const firstRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(v => String(v || "").trim());
     if (firstRow[0] !== "name") {
       sheet.insertRows(1, 1);
-      sheet.getRange(1, 1, 1, 8).setValues([["name", "sheetName", "startDate", "endDate", "idCol", "emailCol", "categoryCol", "nameCol"]]);
+      sheet.getRange(1, 1, 1, 14).setValues([["name", "sheetName", "startYear", "startDate", "endDate", "headerRow", "idMode", "idHeader", "gradeHeader", "classHeader", "numberHeader", "nameHeader", "emailHeader", "categoryHeader"]]);
     }
   }
   return "名簿設定シートを準備しました。";
+}
+
+function getRosterConfigsForUi() {
+  setupRosterConfigSheet();
+  const configs = loadRosterConfigsFromSheet();
+  return configs;
+}
+
+function saveRosterConfigsFromUi(configs) {
+  if (!Array.isArray(configs) || configs.length === 0) {
+    throw new Error("名簿設定が空です。1件以上登録してください。");
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("名簿設定") || ss.insertSheet("名簿設定");
+  const headers = ["name", "sheetName", "startYear", "startDate", "endDate", "headerRow", "idMode", "idHeader", "gradeHeader", "classHeader", "numberHeader", "nameHeader", "emailHeader", "categoryHeader"];
+  const values = [headers];
+
+  configs.forEach(c => {
+    if (!c.sheetName || !c.startDate || !c.endDate || !c.emailHeader) return;
+    const idMode = String(c.idMode || "direct");
+    const canUseDirect = idMode === "direct" && String(c.idHeader || "").trim();
+    const canUseParts = idMode === "parts" && String(c.gradeHeader || "").trim() && String(c.classHeader || "").trim() && String(c.numberHeader || "").trim();
+    if (!(canUseDirect || canUseParts)) return;
+    values.push([
+      String(c.name || c.sheetName).trim(),
+      String(c.sheetName).trim(),
+      Number(c.startYear),
+      String(c.startDate).trim(),
+      String(c.endDate).trim(),
+      Number(c.headerRow || 1),
+      idMode,
+      String(c.idHeader || "").trim(),
+      String(c.gradeHeader || "").trim(),
+      String(c.classHeader || "").trim(),
+      String(c.numberHeader || "").trim(),
+      String(c.nameHeader || "").trim(),
+      String(c.emailHeader || "").trim(),
+      String(c.categoryHeader || "").trim()
+    ]);
+  });
+
+  if (values.length <= 1) {
+    throw new Error("有効な名簿設定がありません。必須項目を入力してください。");
+  }
+
+  sheet.clearContents();
+  sheet.getRange(1, 1, values.length, headers.length).setValues(values);
+  return `名簿設定を保存しました（${values.length - 1}件）。`;
+}
+
+function getRosterUiMeta() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const excluded = { "システム設定": true, "送信予約キュー": true, "名簿設定": true };
+  const sheetNames = ss.getSheets()
+    .map(s => s.getName())
+    .filter(name => !excluded[name]);
+  return {
+    sheetNames: sheetNames,
+    currentYear: new Date().getFullYear()
+  };
+}
+
+function getSheetHeadersForUi(sheetName, headerRow) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  const row = Math.max(1, parseInt(headerRow || 1, 10));
+  const maxCol = sheet.getLastColumn();
+  if (maxCol <= 0) return [];
+  const values = sheet.getRange(row, 1, 1, maxCol).getValues()[0];
+  return values.map(v => String(v || "").trim()).filter(v => v);
 }
 
 function selectRosterConfig(settings, recordDate) {
@@ -230,8 +365,6 @@ function getScheduledPreview(payload) {
   const settings = payload.settings || {};
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const subReminder = settings.subReminder || "【図書室】返却期限間近のお知らせ";
-  const tplReminder = settings.tplReminder || "【氏名】 様\n\n図書室です。\n以下の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
 
   const resolvedRecords = resolveRecordsWithContacts(records, settings);
   const rows = [];
@@ -295,7 +428,7 @@ function processMails(payload) {
                     ((!r.classInfo.match(/(中学|高校)/)) && String(settings.sendStaff) === "true");
     if (!isAllowed) return;
 
-    if (!email) {
+    if (!r.email) {
       if (!r.hasRoster) {
         missingEmails.add(`${r.classInfo || '教職員等'} ${r.name} (ID: ${r.id}) / 基準日 ${dateBase === "dueDate" ? r.dueDate : r.borrowDate} に一致する名簿なし`);
       } else {
@@ -308,8 +441,8 @@ function processMails(payload) {
     dueDate.setHours(0, 0, 0, 0);
 
     if (dueDate < today) {
-      if (!grouped.overdue[id]) grouped.overdue[id] = { user: r, books: [] };
-      grouped.overdue[id].books.push(`・『${r.title}』（期限: ${r.dueDate}）`);
+      if (!grouped.overdue[r.id]) grouped.overdue[r.id] = { user: r, books: [] };
+      grouped.overdue[r.id].books.push(`・『${r.title}』（期限: ${r.dueDate}）`);
     } else {
       grouped.scheduled.push(r);
     }
