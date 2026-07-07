@@ -323,8 +323,7 @@ function getSheetHeadersForUi(sheetName, headerRow) {
   return values.map(v => String(v || "").trim()).filter(v => v);
 }
 
-function selectRosterConfig(settings, recordDate) {
-  const rosterConfigs = getRosterConfigs(settings);
+function selectRosterConfig(rosterConfigs, recordDate) {
   for (let i = 0; i < rosterConfigs.length; i++) {
     const cfg = rosterConfigs[i];
     const start = parseYmdDate(cfg.startDate);
@@ -337,6 +336,7 @@ function selectRosterConfig(settings, recordDate) {
 
 function resolveRecordsWithContacts(records, settings) {
   const dateBase = settings.rosterDateBase === "dueDate" ? "dueDate" : "borrowDate";
+  const rosterConfigs = getRosterConfigs(settings);
   const rosterMaps = {};
   const staffOverrides = parseStaffEmailOverrides(settings.staffOverrides);
   const resolved = [];
@@ -345,7 +345,7 @@ function resolveRecordsWithContacts(records, settings) {
     let id = normalizeTo4DigitId(r.classInfo, r.name);
     let category = detectCategory(r.classInfo);
     const baseDate = parseYmdDate(dateBase === "dueDate" ? r.dueDate : r.borrowDate);
-    const selectedRoster = baseDate ? selectRosterConfig(settings, baseDate) : null;
+    const selectedRoster = baseDate ? selectRosterConfig(rosterConfigs, baseDate) : null;
     const rosterName = selectedRoster ? selectedRoster.name || selectedRoster.sheetName : "";
 
     let email = "";
@@ -391,53 +391,65 @@ function resolveRecordsWithContacts(records, settings) {
 }
 
 function getScheduledPreview(payload) {
-  const records = payload.records || [];
-  const settings = payload.settings || {};
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  try {
+    const records = payload.records || [];
+    const settings = payload.settings || {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const resolvedRecords = resolveRecordsWithContacts(records, settings);
-  const rows = [];
+    const resolvedRecords = resolveRecordsWithContacts(records, settings);
+    const rows = [];
 
-  resolvedRecords.forEach(r => {
-    const dueDate = parseYmdDate(r.dueDate);
-    const isAllowed = (r.classInfo.includes("中学") && String(settings.sendJ) === "true") ||
-      (r.classInfo.includes("高校") && String(settings.sendH) === "true") ||
-      ((!r.classInfo.match(/(中学|高校)/)) && String(settings.sendStaff) === "true");
+    resolvedRecords.forEach(r => {
+      const dueDate = parseYmdDate(r.dueDate);
+      const isAllowed = (r.classInfo.includes("中学") && String(settings.sendJ) === "true") ||
+        (r.classInfo.includes("高校") && String(settings.sendH) === "true") ||
+        ((!r.classInfo.match(/(中学|高校)/)) && String(settings.sendStaff) === "true");
 
-    const status = dueDate && dueDate < today ? "督促（期限超過）" : "予約（前日通知対象）";
-    const recipientName = r.resolvedName || r.name;
-    let deliveryStatus = "";
-    if (!isAllowed) {
-      deliveryStatus = "送信対象外（区分オフ）";
-    } else if (!r.hasRoster && r.category !== "職員教職員") {
-      deliveryStatus = "送信不可（基準日に一致する名簿なし）";
-    } else if (!r.email) {
-      deliveryStatus = "送信不可（名簿に記載なし/メール未登録）";
-    } else if (r.contactSource === "staff_override") {
-      deliveryStatus = "送信可（教職員個別登録メール）";
-    } else {
-      deliveryStatus = "送信可";
-    }
+      const status = dueDate && dueDate < today ? "督促（期限超過）" : "予約（前日通知対象）";
+      const recipientName = r.resolvedName || r.name;
+      let deliveryStatus = "";
+      let warning = "";
+      if (!isAllowed) {
+        deliveryStatus = "送信対象外（区分オフ）";
+      } else if (!r.hasRoster && r.contactSource !== "staff_override") {
+        deliveryStatus = "名簿未登録で送信不可";
+        warning = "基準日に対応する名簿なし";
+      } else if (!r.email) {
+        if (r.category === "職員教職員") {
+          deliveryStatus = "メールアドレス未登録";
+          warning = "氏名をクリックしてメール登録";
+        } else {
+          deliveryStatus = "名簿に記載なしで送信不可";
+          warning = "名簿に該当者/メールなし";
+        }
+      } else if (r.contactSource === "staff_override") {
+        deliveryStatus = "送信可（教職員個別登録）";
+      } else {
+        deliveryStatus = "送信可";
+      }
 
-    rows.push({
-      id: r.id,
-      category: r.category,
-      rosterName: r.rosterName,
-      classInfo: r.classInfo,
-      borrowerName: r.name,
-      recipientName: recipientName,
-      email: r.email,
-      title: r.title,
-      borrowDate: r.borrowDate,
-      dueDate: r.dueDate,
-      status: status,
-      deliveryStatus: deliveryStatus,
-      isAllowed: isAllowed,
-      warning: (!r.hasRoster && r.contactSource !== "staff_override") ? "基準日に一致する名簿がありません" : (!r.email ? "メールアドレス未登録" : "")
+      rows.push({
+        id: r.id,
+        category: r.category,
+        rosterName: r.rosterName,
+        classInfo: r.classInfo,
+        borrowerName: r.name,
+        recipientName: recipientName,
+        email: r.email,
+        title: r.title,
+        borrowDate: r.borrowDate,
+        dueDate: r.dueDate,
+        status: status,
+        deliveryStatus: deliveryStatus,
+        isAllowed: isAllowed,
+        warning: warning
+      });
     });
-  });
-  return { rows: rows };
+    return { rows: rows };
+  } catch (e) {
+    return { rows: [], error: e.message || String(e) };
+  }
 }
 
 // IDの正規化（中高・教職員）

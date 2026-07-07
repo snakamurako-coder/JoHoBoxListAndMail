@@ -50,6 +50,7 @@
       .roster-grid label { font-size: 12px; font-weight: bold; display:block; margin-bottom: 2px; }
       .roster-grid input, .roster-grid select { width: 100%; box-sizing: border-box; padding: 6px; }
       .sortable { cursor: pointer; user-select: none; }
+      .staff-register-link { color: #1565c0; text-decoration: underline; cursor: pointer; }
 
       @media print {
         body * { visibility: hidden; }
@@ -205,6 +206,7 @@
       let rosterConfigsUi = [];
       let rosterMeta = { sheetNames: [], currentYear: new Date().getFullYear() };
       let headerCache = {};
+      let staffOverridesMap = {};
       const defSubOverdue = "【図書室】未返却図書のお知らせ";
       const defTplOverdue = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書が返却期限を過ぎております。\n\n【書籍名】\n\n速やかにご返却ください。";
       const defSubReminder = "【図書室】返却期限間近のお知らせ";
@@ -218,7 +220,10 @@
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
         if(s.sendStaff !== undefined) document.getElementById('sendStaff').checked = String(s.sendStaff) === "true";
-        if(s.staffOverrides !== undefined) document.getElementById('staffOverrides').value = s.staffOverrides;
+        if(s.staffOverrides !== undefined) {
+          document.getElementById('staffOverrides').value = s.staffOverrides;
+          staffOverridesMap = parseStaffOverridesText(s.staffOverrides);
+        }
         
         if(s.subOverdue) document.getElementById('subOverdue').value = s.subOverdue;
         if(s.tplOverdue) document.getElementById('tplOverdue').value = s.tplOverdue;
@@ -232,6 +237,7 @@
         document.getElementById('tplOverdue').value = defTplOverdue;
         document.getElementById('subReminder').value = defSubReminder;
         document.getElementById('tplReminder').value = defTplReminder;
+        staffOverridesMap = parseStaffOverridesText(document.getElementById('staffOverrides').value);
         bindSortEvents();
         loadRosterMetaAndConfigs();
 
@@ -519,6 +525,9 @@
 
         google.script.run
           .withSuccessHandler(function(result) {
+            if (result && result.error) {
+              alert('プレビュー生成エラー: ' + result.error);
+            }
             drawPreviewTable(result.rows || []);
             document.getElementById('loader').style.display = 'none';
           })
@@ -542,6 +551,7 @@
         summary.innerText = `一覧件数: ${rows.length}件（1行1件で全件表示）`;
         rows.forEach(r => {
           let tr = document.createElement('tr');
+          const nameCell = renderRecipientCell(r);
           tr.innerHTML = `
             <td>${r.status || ''}</td>
             <td>${r.deliveryStatus || ''}</td>
@@ -549,7 +559,7 @@
             <td>${r.id || ''}</td>
             <td>${r.rosterName || ''}</td>
             <td>${r.borrowerName || ''}</td>
-            <td>${r.recipientName || ''}</td>
+            <td>${nameCell}</td>
             <td>${r.email || ''}</td>
             <td>${r.classInfo || ''}</td>
             <td>${r.title || ''}</td>
@@ -559,6 +569,43 @@
           `;
           tbody.appendChild(tr);
         });
+      }
+
+      function renderRecipientCell(r) {
+        const name = escapeHtml(r.recipientName || r.borrowerName || '');
+        if (r.category === '職員教職員' && !r.email) {
+          return `<span class="staff-register-link" onclick="registerStaffEmail('${escapeJs(r.borrowerName || '')}')">${name}</span>`;
+        }
+        return name;
+      }
+
+      function registerStaffEmail(name) {
+        const current = staffOverridesMap[name] || '';
+        const entered = prompt(`${name} のメールアドレスを入力してください`, current);
+        if (entered === null) return;
+        const email = String(entered || '').trim();
+        if (!email || !email.includes('@')) {
+          alert('メールアドレス形式が不正です。');
+          return;
+        }
+        staffOverridesMap[name] = email;
+        const text = Object.keys(staffOverridesMap).sort().map(n => `${n}, ${staffOverridesMap[n]}`).join('\n');
+        document.getElementById('staffOverrides').value = text;
+        renderScheduledMailPreview();
+      }
+
+      function parseStaffOverridesText(text) {
+        const map = {};
+        String(text || '').split(/\r?\n/).forEach(line => {
+          const row = String(line || '').trim();
+          if (!row) return;
+          const parts = row.split(',');
+          if (parts.length < 2) return;
+          const name = String(parts[0] || '').trim();
+          const email = String(parts[1] || '').trim();
+          if (name && email) map[name] = email;
+        });
+        return map;
       }
 
       function bindSortEvents() {
@@ -812,6 +859,12 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
+      }
+
+      function escapeJs(text) {
+        return String(text || "")
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'");
       }
     </script>
   </body>
