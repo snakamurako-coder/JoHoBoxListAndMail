@@ -248,7 +248,9 @@
             </div>
             
             <div id="ruleExplanation" style="margin-top:15px;"></div>
+            <div id="ruleEditStatus" style="margin-top:10px; font-size:12px; color:#d35400;"></div>
             <button class="btn btn-primary" style="margin-top:15px; background-color:#e67e22;" onclick="addRule()">このルールを追加</button>
+            <button class="btn btn-secondary" id="cancelRuleEditBtn" style="margin-top:15px; margin-left:8px; display:none;" onclick="cancelRuleEdit()">編集をキャンセル</button>
           </div>
         </div>
       </div>
@@ -262,6 +264,7 @@
       let parsedRecords = [];
       let systemRules = []; 
       let sheetList = [];
+      let editingRuleIndex = -1;
       let overduePreviewRows = [];
       let previewViewState = {
         sortCol: 'borrowDate',
@@ -292,7 +295,7 @@
         }
       }
 
-      function fetchSheetList() {
+      function fetchSheetList(callback) {
         google.script.run.withSuccessHandler(function(list) {
           sheetList = list;
           let select = document.getElementById('ruleSheetSelect');
@@ -302,13 +305,12 @@
             opt.value = name; opt.innerText = name;
             select.appendChild(opt);
           });
+          if (callback) callback();
         }).getSpreadsheetSheets();
       }
 
-      document.getElementById('ruleSheetSelect').addEventListener('change', function(e) {
-        let sheetName = e.target.value;
+      function loadRuleColumns(sheetName, selectedRule) {
         if (!sheetName) return;
-        
         const ids = ['ruleIdCol', 'ruleGradeCol', 'ruleClassCol', 'ruleNumCol', 'ruleNameCol', 'ruleEmailCol'];
         ids.forEach(id => document.getElementById(id).innerHTML = '<option value="">読込中...</option>');
         
@@ -322,8 +324,21 @@
               el.appendChild(opt);
             });
           });
+          if (selectedRule) {
+            document.getElementById('ruleIdCol').value = selectedRule.idCol || "";
+            document.getElementById('ruleGradeCol').value = selectedRule.gradeCol || "";
+            document.getElementById('ruleClassCol').value = selectedRule.classCol || "";
+            document.getElementById('ruleNumCol').value = selectedRule.numCol || "";
+            document.getElementById('ruleNameCol').value = selectedRule.nameCol || "";
+            document.getElementById('ruleEmailCol').value = selectedRule.emailCol || "";
+          }
           updateRuleExplanation();
         }).getSheetHeaders(sheetName);
+      }
+
+      document.getElementById('ruleSheetSelect').addEventListener('change', function(e) {
+        let sheetName = e.target.value;
+        loadRuleColumns(sheetName, null);
       });
 
       document.getElementById('ruleStart').addEventListener('input', function(e) {
@@ -441,6 +456,42 @@
         }).withFailureHandler(err => alert("エラー: " + err.message)).createSheetFromTSV(name, tsv);
       }
 
+      function setRuleEditMode(index) {
+        editingRuleIndex = index;
+        const addBtn = document.querySelector('button[onclick="addRule()"]');
+        const cancelBtn = document.getElementById('cancelRuleEditBtn');
+        const status = document.getElementById('ruleEditStatus');
+        if (index >= 0) {
+          addBtn.innerText = 'このルールを上書き保存';
+          cancelBtn.style.display = 'inline-block';
+          status.innerText = `ルール ${index + 1} を編集中です（保存すると上書きされます）。`;
+        } else {
+          addBtn.innerText = 'このルールを追加';
+          cancelBtn.style.display = 'none';
+          status.innerText = '';
+        }
+      }
+
+      function loadRuleToForm(index) {
+        const rule = systemRules[index];
+        if (!rule) return;
+        setRuleEditMode(index);
+        document.getElementById('ruleDateType').value = rule.dateType || 'borrow';
+        document.getElementById('ruleStart').value = String(rule.start || "").replace(/\//g, '-');
+        document.getElementById('ruleEnd').value = String(rule.end || "").replace(/\//g, '-');
+        const apply = function() {
+          document.getElementById('ruleSheetSelect').value = rule.sheetName || "";
+          loadRuleColumns(rule.sheetName, rule);
+        };
+        if (!sheetList || sheetList.length === 0) fetchSheetList(apply);
+        else apply();
+        updateRuleExplanation();
+      }
+
+      function cancelRuleEdit() {
+        setRuleEditMode(-1);
+      }
+
       function renderRules() {
         let container = document.getElementById('rulesContainer'); container.innerHTML = '';
         if (systemRules.length === 0) {
@@ -453,6 +504,7 @@
           let card = document.createElement('div'); card.className = 'rule-card';
           card.innerHTML = `
             <button class="btn-danger" style="position:absolute; right:15px; top:15px;" onclick="deleteRule(${index})">削除</button>
+            <button class="btn btn-secondary" style="position:absolute; right:75px; top:15px; padding:6px 10px; font-size:12px;" onclick="loadRuleToForm(${index})">編集</button>
             <h4>ルール ${index + 1}: ${r.sheetName}</h4>
             <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> 貸出日が ${r.start} ～ ${r.end} の期間に入る貸出に適用</p>
           `;
@@ -481,6 +533,7 @@
         let newStart = new Date(rule.start).getTime();
         let newEnd = new Date(rule.end).getTime();
         let overlap = systemRules.find(r => {
+          if (editingRuleIndex >= 0 && systemRules[editingRuleIndex] === r) return false;
           if ((r.dateType || 'borrow') !== (rule.dateType || 'borrow')) return false;
           let s = new Date(r.start).getTime();
           let e = new Date(r.end).getTime();
@@ -491,15 +544,19 @@
           return alert(`期間が重複しています（${lbl}）。\n重複先: ${overlap.sheetName} (${overlap.start} ～ ${overlap.end})\n期間が重ならないように設定してください。`);
         }
 
-        systemRules.push(rule);
+        if (editingRuleIndex >= 0) systemRules[editingRuleIndex] = rule;
+        else systemRules.push(rule);
         localStorage.setItem('v11_rules', JSON.stringify(systemRules));
         renderRules(); updateRuleExplanation();
-        alert('ルールを追加しました。画面中央の「一括処理を実行」ボタンを押すと完全に保存されます。');
+        alert(editingRuleIndex >= 0 ? 'ルールを上書きしました。画面中央の「一括処理を実行」ボタンを押すと完全に保存されます。' : 'ルールを追加しました。画面中央の「一括処理を実行」ボタンを押すと完全に保存されます。');
+        setRuleEditMode(-1);
       }
 
       function deleteRule(idx) {
         if(!confirm('このルールを削除しますか？')) return;
         systemRules.splice(idx, 1);
+        if (editingRuleIndex === idx) setRuleEditMode(-1);
+        else if (editingRuleIndex > idx) setRuleEditMode(editingRuleIndex - 1);
         localStorage.setItem('v11_rules', JSON.stringify(systemRules));
         renderRules(); updateRuleExplanation();
       }
@@ -660,6 +717,7 @@
           case 'nendo':
             return row.nendo === '不明' ? -1 : (parseInt(row.nendo, 10) || 0);
           case 'rosterSheet': return row.rosterSheet || '';
+          case 'rosterNendo': return row.rosterNendo || '';
           case 'email': return row.email || '';
           case 'category': return getPreviewCategory(row);
           default: return '';
@@ -808,6 +866,7 @@
           { key: 'borrowDate', label: '貸出日' },
           { key: 'dueDate', label: '返却期限' },
           { key: 'nendo', label: '貸出年度' },
+          { key: 'rosterNendo', label: '参照名簿年度' },
           { key: 'rosterSheet', label: '参照名簿' },
           { key: 'email', label: 'メール' }
         ];
@@ -821,7 +880,7 @@
         html += '</tr></thead><tbody>';
 
         if (filteredRows.length === 0) {
-          html += '<tr><td colspan="12" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
+          html += '<tr><td colspan="13" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
         } else {
           filteredRows.forEach(r => {
             let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
@@ -846,6 +905,7 @@
               <td>${escapeHtml(r.borrowDate)}</td>
               <td>${escapeHtml(r.dueDate)}</td>
               <td>${escapeHtml(r.nendo)}</td>
+              <td>${escapeHtml(r.rosterNendo || '')}</td>
               <td>${escapeHtml(r.rosterSheet)}</td>
               <td>${r.email ? escapeHtml(r.email) : '<span style="color:#999;">—</span>'}</td>
             </tr>`;

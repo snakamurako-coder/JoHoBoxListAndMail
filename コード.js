@@ -177,6 +177,12 @@ function parseRuleDate(dateStr) {
   return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
 }
 
+function getRuleNendoLabel(rule) {
+  if (!rule || !rule.start) return "";
+  let nendo = getNendoFromDateStr(rule.start);
+  return nendo != null ? `${nendo}年度` : "";
+}
+
 // 指定基準日の名簿ルールを取得（期間一致のみ）
 function findRulesForTargetDate(rules, bDate, dDate) {
   let matched = [];
@@ -326,6 +332,7 @@ function buildMailPlan(records, settings, rules) {
         dueDate: r.dueDate,
         nendo: borrowNendo != null ? String(borrowNendo) : (r.nendo || ""),
         rosterSheet: isStaff ? "教職員名簿" : (matchedRule ? matchedRule.sheetName : ""),
+        rosterNendo: isStaff ? "教職員" : (matchedRule ? getRuleNendoLabel(matchedRule) : ""),
         id: lookupId,
         isStaff: isStaff,
         willSend: status === "送信予定"
