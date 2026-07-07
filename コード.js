@@ -339,7 +339,6 @@ function buildMailPlan(records, settings, rules) {
         borrowName: r.name,
         rosterName: rosterName,
         matchId: lookupId,
-        currentId: currentId,
         email: email,
         status: status,
         statusDetail: statusDetail,
