@@ -481,12 +481,14 @@
         let newStart = new Date(rule.start).getTime();
         let newEnd = new Date(rule.end).getTime();
         let overlap = systemRules.find(r => {
+          if ((r.dateType || 'borrow') !== (rule.dateType || 'borrow')) return false;
           let s = new Date(r.start).getTime();
           let e = new Date(r.end).getTime();
           return !(newEnd < s || e < newStart);
         });
         if (overlap) {
-          return alert(`期間が重複しています。\n重複先: ${overlap.sheetName} (${overlap.start} ～ ${overlap.end})\n期間が重ならないように設定してください。`);
+          let lbl = (rule.dateType || 'borrow') === 'due' ? '返却日基準' : '貸出日基準';
+          return alert(`期間が重複しています（${lbl}）。\n重複先: ${overlap.sheetName} (${overlap.start} ～ ${overlap.end})\n期間が重ならないように設定してください。`);
         }
 
         systemRules.push(rule);

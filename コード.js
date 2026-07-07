@@ -177,31 +177,21 @@ function parseRuleDate(dateStr) {
   return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
 }
 
-// 貸出日が属する名簿ルールを取得（期間設定を最優先）
-function findRulesForBorrowDate(rules, bDate, borrowDateStr) {
+// 指定基準日の名簿ルールを取得（期間一致のみ）
+function findRulesForTargetDate(rules, bDate, dDate) {
   let matched = [];
   for (let i = 0; i < rules.length; i++) {
     let rule = rules[i];
+    let dateType = rule.dateType || "borrow";
+    let targetDate = dateType === "due" ? dDate : bDate;
     let start = parseRuleDate(rule.start).getTime();
     let end = parseRuleDate(rule.end);
     end.setHours(23, 59, 59, 999);
-    if (bDate >= start && bDate <= end.getTime()) {
+    if (targetDate >= start && targetDate <= end.getTime()) {
       matched.push({ rule, start });
     }
   }
-  if (matched.length > 0) {
-    return matched.map(x => x.rule);
-  }
-
-  // フォールバック: 貸出年度と開始年度が一致するルールを採用
-  let borrowNendo = getNendoFromDateStr(borrowDateStr);
-  if (borrowNendo != null) {
-    for (let i = 0; i < rules.length; i++) {
-      let ruleNendo = getNendoFromDateStr(rules[i].start);
-      if (ruleNendo === borrowNendo) return [rules[i]];
-    }
-  }
-  return [];
+  return matched.map(x => x.rule);
 }
 
 // ルールに基づいて特定シートの名簿Mapを生成する（学年・組・番号の4桁IDで照合）
@@ -274,7 +264,7 @@ function buildMailPlan(records, settings, rules) {
       rosterName = staffInfo.name || r.name;
       ruleMatched = true;
     } else {
-      let matchedRules = findRulesForBorrowDate(rules, bDate, r.borrowDate);
+      let matchedRules = findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime());
       if (matchedRules.length > 1) {
         ruleMatched = false;
         matchedRule = null;
@@ -308,7 +298,7 @@ function buildMailPlan(records, settings, rules) {
       if (!isAllowed) {
         status = "対象外";
         statusDetail = "送信設定オフ";
-      } else if (!isStaff && findRulesForBorrowDate(rules, bDate, r.borrowDate).length > 1) {
+      } else if (!isStaff && findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime()).length > 1) {
         status = "送信不可";
         statusDetail = "名簿ルール重複";
       } else if (!ruleMatched) {
@@ -347,7 +337,7 @@ function buildMailPlan(records, settings, rules) {
     if (!email) {
       if (isStaff) {
         missingEmails.add(`教職員: ${r.name} (プレビュー画面の氏名をクリックして登録可能)`);
-      } else if (findRulesForBorrowDate(rules, bDate, r.borrowDate).length > 1) {
+      } else if (findRulesForTargetDate(rules, bDate, new Date(dDateParts[0], dDateParts[1] - 1, dDateParts[2]).getTime()).length > 1) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対して名簿ルールが重複しています。期間設定を見直してください)`);
       } else if (!ruleMatched) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate}＝${borrowNendo}年度に対応する名簿ルールがありません)`);
