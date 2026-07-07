@@ -254,12 +254,25 @@
       const defTplOverdue = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書が返却期限を過ぎております。\n\n【書籍名】\n\n速やかにご返却ください。";
       const defSubReminder = "【図書室】返却期限間近のお知らせ";
       const defTplReminder = "【クラス】 【氏名】 様\n\n図書室です。\n貸出中の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
+      function applyRosterConfigsFromJson(raw) {
+        if (!raw) return false;
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            rosterConfigsUi = parsed;
+            return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+
       function applySettings(s) {
         if (s.rosterDateBase === "dueDate") {
           document.getElementById('rosterDateBaseDue').checked = true;
         } else {
           document.getElementById('rosterDateBaseBorrow').checked = true;
         }
+        applyRosterConfigsFromJson(s.rosterConfigs);
         if(s.sendJ !== undefined) document.getElementById('sendJ').checked = String(s.sendJ) === "true";
         if(s.sendH !== undefined) document.getElementById('sendH').checked = String(s.sendH) === "true";
         if(s.sendStaff !== undefined) document.getElementById('sendStaff').checked = String(s.sendStaff) === "true";
@@ -283,7 +296,6 @@
         staffOverridesMap = parseStaffOverridesText(document.getElementById('staffOverrides').value);
         bindSortEvents();
         bindFilterEvents();
-        loadRosterMetaAndConfigs();
 
         let localSettings = localStorage.getItem('v7_settings');
         if (localSettings) {
@@ -291,10 +303,13 @@
           document.getElementById('syncStatus').innerText = "クラウド設定と同期中...";
         }
 
+        loadRosterMetaAndConfigs();
+
         google.script.run
           .withSuccessHandler(function(cloudSettings) {
             if (cloudSettings) {
               applySettings(cloudSettings);
+              if (rosterConfigsUi.length > 0) refreshRosterEditorUi(0);
               localStorage.setItem('v7_settings', JSON.stringify(cloudSettings));
             }
             document.getElementById('syncStatus').innerText = "✓ 設定同期完了";
@@ -545,6 +560,7 @@
         return {
           rosterDateBase: document.querySelector('input[name="rosterDateBase"]:checked').value,
           rosterConfigs: JSON.stringify(rosterConfigs),
+          preferUiRosterConfigs: true,
           sendJ: document.getElementById('sendJ').checked,
           sendH: document.getElementById('sendH').checked,
           sendStaff: document.getElementById('sendStaff').checked,
@@ -604,7 +620,7 @@
             <td class="preview-delivery-col">${escapeHtml(r.deliveryStatus || '')}</td>
             <td>${escapeHtml(r.category || '')}</td>
             <td>${escapeHtml(r.id || '')}</td>
-            <td>${escapeHtml(r.rosterName || '')}</td>
+            <td>${escapeHtml(formatRosterDisplay(r))}</td>
             <td>${escapeHtml(r.borrowerName || '')}</td>
             <td>${nameCell}</td>
             <td>${escapeHtml(r.email || '')}</td>
@@ -622,6 +638,14 @@
         const ds = String(r.deliveryStatus || '');
         if (ds.indexOf('送信可') === 0) return 'preview-row-send-ok';
         return 'preview-row-send-ng';
+      }
+
+      function formatRosterDisplay(r) {
+        if (!r.rosterName && !r.rosterSheetName) return '';
+        const base = r.baseDateValue ? `基準日:${r.baseDateValue}` : '';
+        const lookup = r.lookupKey ? `照合:${r.lookupKey}` : '';
+        const roster = [r.rosterName, r.rosterSheetName ? `(${r.rosterSheetName})` : ''].join(' ').trim();
+        return [roster, base, lookup].filter(Boolean).join(' / ');
       }
 
       function renderRecipientCell(r) {
@@ -749,21 +773,32 @@
         google.script.run
           .withSuccessHandler(function(meta) {
             rosterMeta = meta || rosterMeta;
-            google.script.run
-              .withSuccessHandler(function(configs) {
-                rosterConfigsUi = Array.isArray(configs) ? configs : [];
-                if (!rosterConfigsUi.length) rosterConfigsUi = [buildDefaultRosterRow()];
-                refreshRosterEditorUi(0);
-              })
-              .withFailureHandler(function(err) {
-                document.getElementById('rosterSaveStatus').innerText = '名簿設定読込エラー: ' + err.message;
-              })
-              .getRosterConfigsForUi();
+            finalizeRosterConfigsLoad();
           })
           .withFailureHandler(function(err) {
             document.getElementById('rosterSaveStatus').innerText = '名簿メタ情報読込エラー: ' + err.message;
           })
           .getRosterUiMeta();
+      }
+
+      function finalizeRosterConfigsLoad() {
+        if (rosterConfigsUi.length > 0) {
+          refreshRosterEditorUi(0);
+          document.getElementById('rosterSaveStatus').innerText = 'UI名簿設定を使用中（プレビューはこの内容のみ参照）';
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function(configs) {
+            if (rosterConfigsUi.length > 0) return;
+            rosterConfigsUi = Array.isArray(configs) ? configs : [];
+            if (!rosterConfigsUi.length) rosterConfigsUi = [buildDefaultRosterRow()];
+            refreshRosterEditorUi(0);
+            document.getElementById('rosterSaveStatus').innerText = '名簿設定シートから読み込みました（保存で上書きできます）';
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('rosterSaveStatus').innerText = '名簿設定読込エラー: ' + err.message;
+          })
+          .getRosterConfigsForUi();
       }
 
       function buildDefaultRosterRow() {
@@ -848,22 +883,7 @@
           refreshRosterEditorUi(rosterConfigsUi.length - 1);
         } else {
           const idx = Number(selected || 0);
-          const currentName = String((rosterConfigsUi[idx] && rosterConfigsUi[idx].name) || '').trim();
-          let nextName = currentName;
-          const shouldRename = confirm(`名簿名を変更しますか？\n現在: ${currentName || '(未設定)'}`);
-          if (shouldRename) {
-            const inputName = prompt('新しい名簿名を入力してください', currentName || `${row.startYear || rosterMeta.currentYear}年度名簿`);
-            if (inputName === null) {
-              document.getElementById('rosterSaveStatus').innerText = '名簿名の変更をキャンセルしました。';
-              return;
-            }
-            nextName = String(inputName || '').trim();
-            if (!nextName) {
-              alert('名簿名は空欄にできません。');
-              return;
-            }
-          }
-          row.name = nextName;
+          row.name = String((rosterConfigsUi[idx] && rosterConfigsUi[idx].name) || '').trim();
           rosterConfigsUi[idx] = row;
           refreshRosterEditorUi(idx);
         }
@@ -875,13 +895,16 @@
         if (selected === '__new__') return;
         const idx = Number(selected || 0);
         if (!rosterConfigsUi.length || idx < 0 || idx >= rosterConfigsUi.length) return;
-        rosterConfigsUi[idx] = collectRosterEditorConfig();
+        const row = collectRosterEditorConfig();
+        row.name = String(rosterConfigsUi[idx].name || '').trim();
+        rosterConfigsUi[idx] = row;
         renderRosterSummary();
       }
 
       function saveRosterConfigs() {
         syncEditorToSelected();
-        if (document.getElementById('rosterSelect').value === '__new__') {
+        const selected = document.getElementById('rosterSelect').value;
+        if (selected === '__new__') {
           const draft = collectRosterEditorConfig();
           const hasDraft = draft.sheetName || draft.emailHeader || draft.idHeader || draft.gradeHeader;
           if (hasDraft) rosterConfigsUi.push(draft);
@@ -891,7 +914,37 @@
           alert('保存する名簿設定がありません。');
           return;
         }
+
+        const currentIdx = selected === '__new__' ? rows.length - 1 : Number(selected || 0);
+        if (currentIdx >= 0 && currentIdx < rows.length) {
+          const currentName = String(rows[currentIdx].name || '').trim();
+          if (!currentName) {
+            const inputName = prompt('名簿名を入力してください', `${rows[currentIdx].startYear || rosterMeta.currentYear}年度名簿`);
+            if (inputName === null || !String(inputName).trim()) {
+              alert('名簿名が未入力のため保存を中止しました。');
+              return;
+            }
+            rows[currentIdx].name = String(inputName).trim();
+          } else {
+            const shouldRename = confirm(`名簿名を変更しますか？\n現在: ${currentName}\n\n「いいえ」で現在の名簿名のまま保存します。`);
+            if (shouldRename) {
+              const inputName = prompt('新しい名簿名を入力してください', currentName);
+              if (inputName === null) {
+                document.getElementById('rosterSaveStatus').innerText = '保存をキャンセルしました。';
+                return;
+              }
+              const nextName = String(inputName || '').trim();
+              if (!nextName) {
+                alert('名簿名は空欄にできません。');
+                return;
+              }
+              rows[currentIdx].name = nextName;
+            }
+          }
+        }
+
         for (let i = 0; i < rows.length; i++) {
+          if (i === currentIdx) continue;
           if (!String(rows[i].name || '').trim()) {
             const inputName = prompt(`名簿 ${i + 1} の名簿名を入力してください`, `${rows[i].startYear || rosterMeta.currentYear}年度名簿`);
             if (inputName === null || !String(inputName).trim()) {
@@ -907,6 +960,11 @@
             document.getElementById('rosterSaveStatus').innerText = msg;
             rosterConfigsUi = rows;
             refreshRosterEditorUi(0);
+            const settings = collectCurrentSettings();
+            if (settings) {
+              localStorage.setItem('v7_settings', JSON.stringify(settings));
+              google.script.run.saveSettings(settings);
+            }
           })
           .withFailureHandler(function(err) {
             document.getElementById('rosterSaveStatus').innerText = '保存エラー: ' + err.message;

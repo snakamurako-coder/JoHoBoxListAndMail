@@ -204,6 +204,25 @@ function buildRosterContactMap(rosterConfig) {
 function getRosterConfigs(settings) {
   settings = settings || {};
   let parsed = [];
+  const preferUi = settings.preferUiRosterConfigs === true || String(settings.preferUiRosterConfigs) === "true";
+
+  if (preferUi) {
+    if (!settings.rosterConfigs) {
+      throw new Error("UI名簿設定がありません。名簿設定を登録してからプレビューしてください。");
+    }
+    try {
+      parsed = JSON.parse(settings.rosterConfigs);
+    } catch (e) {
+      throw new Error("名簿設定（rosterConfigs）のJSON形式が不正です。");
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error("UI名簿設定が空です。名簿設定を登録してからプレビューしてください。");
+    }
+    return parsed.map(normalizeRosterConfig);
+  }
+
+  const sheetConfigs = loadRosterConfigsFromSheet();
+  if (sheetConfigs.length > 0) return sheetConfigs;
 
   if (settings.rosterConfigs) {
     try {
@@ -215,9 +234,6 @@ function getRosterConfigs(settings) {
       return parsed.map(normalizeRosterConfig);
     }
   }
-
-  const sheetConfigs = loadRosterConfigsFromSheet();
-  if (sheetConfigs.length > 0) return sheetConfigs;
 
   if (settings.sheetName && settings.idCol && settings.emailCol) {
     // 旧設定形式の後方互換
@@ -380,15 +396,43 @@ function getSheetHeadersForUi(sheetName, headerRow) {
   return values.map(v => String(v || "").trim()).filter(v => v);
 }
 
+function getRosterCacheKey(cfg) {
+  return [
+    cfg.name || "",
+    cfg.sheetName || "",
+    cfg.startDate || "",
+    cfg.endDate || ""
+  ].join("::");
+}
+
 function selectRosterConfig(rosterConfigs, recordDate) {
+  let best = null;
+  let bestSpan = Infinity;
   for (let i = 0; i < rosterConfigs.length; i++) {
     const cfg = rosterConfigs[i];
     const start = parseYmdDate(cfg.startDate);
     const end = parseYmdDate(cfg.endDate);
     if (!start || !end) continue;
-    if (recordDate >= start && recordDate <= end) return cfg;
+    if (recordDate >= start && recordDate <= end) {
+      const span = end.getTime() - start.getTime();
+      if (span < bestSpan) {
+        bestSpan = span;
+        best = cfg;
+      }
+    }
   }
-  return null;
+  return best;
+}
+
+function lookupContactInRoster(rosterMap, rosterConfig, category, id) {
+  const hasCategoryCol = !!String(rosterConfig.categoryHeader || "").trim();
+  if (category === "職員教職員") {
+    return rosterMap[id] || null;
+  }
+  if (hasCategoryCol) {
+    return rosterMap[`${category}|${id}`] || null;
+  }
+  return rosterMap[id] || null;
 }
 
 function resolveRecordsWithContacts(records, settings) {
@@ -401,20 +445,23 @@ function resolveRecordsWithContacts(records, settings) {
   records.forEach(r => {
     let id = normalizeTo4DigitId(r.classInfo, r.name);
     let category = detectCategory(r.classInfo);
-    const baseDate = parseYmdDate(dateBase === "dueDate" ? r.dueDate : r.borrowDate);
+    const baseDateValue = dateBase === "dueDate" ? r.dueDate : r.borrowDate;
+    const baseDate = parseYmdDate(baseDateValue);
     const selectedRoster = baseDate ? selectRosterConfig(rosterConfigs, baseDate) : null;
     const rosterName = selectedRoster ? selectedRoster.name || selectedRoster.sheetName : "";
+    const rosterSheetName = selectedRoster ? selectedRoster.sheetName : "";
 
     let email = "";
     let resolvedName = "";
     let contactSource = "none";
+    let lookupKey = "";
     if (selectedRoster) {
-      const rosterKey = selectedRoster.name || selectedRoster.sheetName;
+      const rosterKey = getRosterCacheKey(selectedRoster);
       if (!rosterMaps[rosterKey]) {
         rosterMaps[rosterKey] = buildRosterContactMap(selectedRoster);
       }
-      const rosterMap = rosterMaps[rosterKey];
-      const contact = rosterMap[`${category}|${id}`] || rosterMap[id];
+      lookupKey = category === "職員教職員" ? id : (String(selectedRoster.categoryHeader || "").trim() ? `${category}|${id}` : id);
+      const contact = lookupContactInRoster(rosterMaps[rosterKey], selectedRoster, category, id);
       if (contact) {
         email = contact.email || "";
         resolvedName = contact.name || "";
@@ -422,7 +469,7 @@ function resolveRecordsWithContacts(records, settings) {
       }
     }
 
-    // 名簿未解決の教職員は個別登録を適用
+    // 名簿未解決の教職員のみ、同一借用者名の個別登録を参照（名簿横断はしない）
     if (!email && category === "職員教職員") {
       const overrideEmail = staffOverrides[r.name] || "";
       if (overrideEmail) {
@@ -436,6 +483,9 @@ function resolveRecordsWithContacts(records, settings) {
       id: id,
       category: category,
       rosterName: rosterName,
+      rosterSheetName: rosterSheetName,
+      lookupKey: lookupKey,
+      baseDateValue: baseDateValue,
       resolvedName: resolvedName,
       email: email,
       contactSource: contactSource,
@@ -487,10 +537,17 @@ function getScheduledPreview(payload) {
         deliveryStatus = "送信可";
       }
 
+      if (r.contactSource === "roster" && r.resolvedName && r.name && r.resolvedName !== r.name) {
+        warning = warning ? `${warning} / 借用者名と名簿氏名が不一致` : "借用者名と名簿氏名が不一致";
+      }
+
       rows.push({
         id: r.id,
         category: r.category,
         rosterName: r.rosterName,
+        rosterSheetName: r.rosterSheetName,
+        lookupKey: r.lookupKey,
+        baseDateValue: r.baseDateValue,
         classInfo: r.classInfo,
         borrowerName: r.name,
         recipientName: recipientName,
@@ -632,8 +689,9 @@ function processDailyScheduledEmails() {
     }
   }
 
-  // スプレッドシートから設定をロード（自動実行時にも最新設定を反映）
+  // スプレッドシートから設定をロード（自動実行時は名簿設定シートを優先）
   let settings = loadSettings() || {};
+  settings.preferUiRosterConfigs = false;
   let subReminder = settings.subReminder || "【図書室】返却期限間近のお知らせ";
   let tplReminder = settings.tplReminder || "【氏名】 様\n\n図書室です。\n以下の図書の返却期限が【明日】となっております。\n\n【書籍名】\n\n期限内のご返却をお願いいたします。";
 
