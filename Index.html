@@ -201,7 +201,7 @@
           <strong>【名簿管理の手順と注意事項】</strong><br>
           ① <strong>名簿の登録</strong>：Excel等から「学年・組・番号・メールアドレス」の表をコピーし、下の「A」欄に貼り付けてシートを作成します。<br>
           ② <strong>ルールの紐付け</strong>：追加したシートを選び、どの列がIDやアドレスに該当するかを選択します。同じ見出し名（例:学年）が複数あっても、自動で列アルファベットが付与されるので正確に選べます。<br>
-          ③ <strong>氏名列は必須</strong>：図書データのクラス表示は「現在の学年・組」になるため、年をまたいだ督促では4桁IDではなく<strong>氏名</strong>で名簿照合します。各年度の名簿に氏名列を必ず指定してください。<br>
+          ③ <strong>照合方法</strong>：貸出年度の名簿を使い、貸出データの<strong>区分（中学・高校）</strong>と<strong>学年・組・番号</strong>（4桁ID）でメールアドレスを照合します。教職員は教職員名簿で照合します。<br>
           ④ <strong>年度の自動補完</strong>：開始日を選択すると、終了日は自動的に「翌年の3月31日」にセットされます。必要に応じて手動で微調整してください。
         </div>
         
@@ -242,7 +242,7 @@
               <div class="form-item"><label>学年列（IDが無い場合必須）</label><select id="ruleGradeCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>組列（IDが無い場合必須）</label><select id="ruleClassCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>番号列（IDが無い場合必須）</label><select id="ruleNumCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>氏名列（年をまたぐ督促に必須）</label><select id="ruleNameCol"><option value="">-- シートを選択してください --</option></select></div>
+              <div class="form-item"><label>氏名列（任意・プレビュー表示用）</label><select id="ruleNameCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>メール列（必須）</label><select id="ruleEmailCol"><option value="">-- シートを選択してください --</option></select></div>
             </div>
             
@@ -450,11 +450,10 @@
         }
         systemRules.forEach((r, index) => {
           let card = document.createElement('div'); card.className = 'rule-card';
-          let nameColWarn = r.nameCol ? '' : ' <span style="color:#c0392b;">⚠ 氏名列未設定</span>';
           card.innerHTML = `
             <button class="btn-danger" style="position:absolute; right:15px; top:15px;" onclick="deleteRule(${index})">削除</button>
-            <h4>ルール ${index + 1}: ${r.sheetName}${nameColWarn}</h4>
-            <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> 貸出日が ${r.start} ～ ${r.end} の名簿を使用（氏名で照合）</p>
+            <h4>ルール ${index + 1}: ${r.sheetName}</h4>
+            <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> 貸出日が ${r.start} ～ ${r.end} の名簿を使用（学年・組・番号で照合）</p>
           `;
           container.appendChild(card);
         });
@@ -477,7 +476,6 @@
         };
 
         if(!rule.start || !rule.end || !rule.sheetName || !rule.emailCol) return alert("「期間」「対象シート」「メール列」は必須です。");
-        if(!rule.nameCol) return alert("年をまたぐ督促のため「氏名列」の指定が必須です。");
         if(!rule.idCol && (!rule.gradeCol || !rule.classCol || !rule.numCol)) return alert("照合のため「4桁ID列」か、または「学年・組・番号の全3列」のどちらかを選択してください。");
 
         systemRules.push(rule);
@@ -639,6 +637,7 @@
         switch (col) {
           case 'status':
             return ({ '送信予定': '0', '送信不可': '1', '対象外': '2' }[row.status] || '9') + (row.statusDetail || '');
+          case 'matchId': return row.matchId || '';
           case 'rosterName': return row.rosterName || '';
           case 'borrowName': return row.borrowName || '';
           case 'classInfo': return row.classInfo || '';
@@ -788,7 +787,8 @@
         const cols = [
           { key: 'status', label: 'ステータス' },
           { key: 'category', label: '区分' },
-          { key: 'rosterName', label: '宛先氏名（名簿）' },
+          { key: 'matchId', label: '照合ID（学年・組・番）' },
+          { key: 'rosterName', label: '名簿氏名' },
           { key: 'borrowName', label: '貸出データ氏名' },
           { key: 'classInfo', label: 'クラス' },
           { key: 'title', label: '書籍名' },
@@ -808,25 +808,25 @@
         html += '</tr></thead><tbody>';
 
         if (filteredRows.length === 0) {
-          html += '<tr><td colspan="11" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
+          html += '<tr><td colspan="12" style="text-align:center; color:#7f8c8d; padding:20px;">条件に一致するデータがありません。フィルタを見直してください。</td></tr>';
         } else {
           filteredRows.forEach(r => {
             let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
             let statusText = r.statusDetail ? `${r.status}（${r.statusDetail}）` : r.status;
             let cat = getPreviewCategory(r);
 
+            let matchIdHtml = r.isStaff ? 'STAFF' : escapeHtml(r.matchId || '—');
             let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
             let borrowNameHtml = escapeHtml(r.borrowName);
             if (r.isStaff && r.statusDetail === 'メール未登録') {
               borrowNameHtml = `<span class="staff-link" onclick="registerStaffPrompt('${escapeJsStr(r.id)}', '${escapeJsStr(r.borrowName)}')">${escapeHtml(r.borrowName)}</span>`;
             }
 
-            let nameDiffClass = (r.rosterName && r.borrowName && r.rosterName.replace(/[\s　]+/g, '') !== r.borrowName.replace(/[\s　]+/g, '')) ? ' preview-name-diff' : '';
-
             html += `<tr>
               <td class="${statusClass}">${escapeHtml(statusText)}</td>
               <td>${escapeHtml(cat)}</td>
-              <td class="${nameDiffClass}">${rosterNameHtml}</td>
+              <td>${matchIdHtml}</td>
+              <td>${rosterNameHtml}</td>
               <td>${borrowNameHtml}</td>
               <td>${escapeHtml(r.classInfo)}</td>
               <td>${escapeHtml(r.title)}</td>

@@ -161,7 +161,7 @@ function normalizeTo4DigitId(classInfo, name) {
   return `${match[2]}${match[3]}${String(match[4]).padStart(2, '0')}`;
 }
 
-// ルールに基づいて特定シートの名簿Mapを生成する（ID照合と氏名照合の両方）
+// ルールに基づいて特定シートの名簿Mapを生成する（学年・組・番号の4桁IDで照合）
 function getRosterMapsForRule(rule) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(rule.sheetName);
@@ -169,7 +169,6 @@ function getRosterMapsForRule(rule) {
   
   let data = sheet.getDataRange().getValues();
   let byId = {};
-  let byName = {};
   
   for (let i = 1; i < data.length; i++) {
     let row = data[i];
@@ -189,12 +188,9 @@ function getRosterMapsForRule(rule) {
     let email = rule.emailCol ? String(row[parseInt(rule.emailCol) - 1] || "").trim() : "";
     let rosterName = rule.nameCol ? String(row[parseInt(rule.nameCol) - 1] || "").trim() : "";
     
-    if (id && email) byId[id] = email;
-    if (rosterName && email) {
-      byName[normalizeName(rosterName)] = { email: email, rosterName: rosterName };
-    }
+    if (id && email) byId[id] = { email: email, rosterName: rosterName };
   }
-  return { byId, byName };
+  return { byId };
 }
 
 // 貸出日が属する年度の名簿ルールを取得（年をまたぐ未返却は貸出年度の名簿を使う）
@@ -208,15 +204,9 @@ function findRuleForBorrowDate(rules, bDate) {
   return null;
 }
 
-// 名簿からメールアドレス・宛先氏名を照合（年をまたぐ督促は氏名照合を優先）
-function lookupInRoster(maps, rule, studentName, id) {
-  let nameKey = normalizeName(studentName);
-  if (rule.nameCol && nameKey && maps.byName[nameKey]) {
-    return maps.byName[nameKey];
-  }
-  if (!rule.nameCol && id && maps.byId[id]) {
-    return { email: maps.byId[id], rosterName: studentName };
-  }
+// 名簿からメールアドレスを照合（貸出年度の名簿を学年・組・番号の4桁IDで照合）
+function lookupInRoster(maps, id) {
+  if (id && maps.byId[id]) return maps.byId[id];
   return { email: "", rosterName: "" };
 }
 
@@ -256,9 +246,9 @@ function buildMailPlan(records, settings, rules) {
         let cacheKey = matchedRule.sheetName;
         if (!rosterCache[cacheKey]) {
           let maps = getRosterMapsForRule(matchedRule);
-          rosterCache[cacheKey] = maps !== null ? maps : { byId: {}, byName: {} };
+          rosterCache[cacheKey] = maps !== null ? maps : { byId: {} };
         }
-        let found = lookupInRoster(rosterCache[cacheKey], matchedRule, r.name, id);
+        let found = lookupInRoster(rosterCache[cacheKey], id);
         email = found.email;
         rosterName = found.rosterName || "";
       }
@@ -283,12 +273,9 @@ function buildMailPlan(records, settings, rules) {
       } else if (!isStaff && !ruleMatched) {
         status = "送信不可";
         statusDetail = "名簿ルールなし";
-      } else if (!isStaff && matchedRule && !matchedRule.nameCol) {
-        status = "送信不可";
-        statusDetail = "氏名列未設定";
       } else if (!email) {
         status = "送信不可";
-        statusDetail = isStaff ? "メール未登録" : "名簿に氏名なし";
+        statusDetail = isStaff ? "メール未登録" : "学年・組・番未一致";
       } else {
         status = "送信予定";
         statusDetail = "";
@@ -297,6 +284,7 @@ function buildMailPlan(records, settings, rules) {
       previewRows.push({
         borrowName: r.name,
         rosterName: rosterName,
+        matchId: id,
         email: email,
         status: status,
         statusDetail: statusDetail,
@@ -319,10 +307,8 @@ function buildMailPlan(records, settings, rules) {
         missingEmails.add(`教職員: ${r.name} (プレビュー画面の氏名をクリックして登録可能)`);
       } else if (!ruleMatched) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対応する名簿ルールがありません)`);
-      } else if (!matchedRule.nameCol) {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」のルールに氏名列が未設定です。詳細設定で氏名列を指定してください)`);
       } else {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」に氏名「${r.name}」が見つかりません)`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」にID[${id}]が見つかりません)`);
       }
     }
 
