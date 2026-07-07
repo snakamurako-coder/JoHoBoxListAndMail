@@ -59,6 +59,19 @@
       .status-future { color: #27ae60; font-weight: bold; }
       .staff-link { color: #2980b9; text-decoration: underline; cursor: pointer; }
 
+      /* 即時督促プレビュー */
+      .preview-section { margin-bottom: 35px; padding: 15px; background: #fff8f8; border: 1px solid #e8b4b4; border-radius: 6px; }
+      .preview-section h2 { font-size: 18px; color: #c0392b; margin: 0 0 10px 0; border-bottom: 2px solid #e8b4b4; padding-bottom: 8px; }
+      .preview-summary { font-size: 13px; color: #555; margin-bottom: 12px; }
+      .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .preview-table th, .preview-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+      .preview-table th { background: #f2dede; white-space: nowrap; }
+      .preview-table tr:nth-child(even) { background: #fdfafa; }
+      .preview-status-send { color: #27ae60; font-weight: bold; }
+      .preview-status-skip { color: #c0392b; font-weight: bold; }
+      .preview-status-off { color: #7f8c8d; }
+      .preview-name-diff { color: #d35400; font-weight: bold; }
+
       @media print {
         body * { visibility: hidden; }
         #printSection, #printSection * { visibility: visible; }
@@ -285,7 +298,10 @@
       });
 
       ['sendH', 'sendJ', 'sendStaff'].forEach(id => {
-        document.getElementById(id).addEventListener('change', updateMatrixTable);
+        document.getElementById(id).addEventListener('change', function() {
+          updateMatrixTable();
+          refreshOverduePreview();
+        });
       });
 
       function updateMatrixTable() {
@@ -386,6 +402,7 @@
         if (systemRules.length === 0) {
           container.innerHTML = '<p style="font-size:13px; color:#c0392b;">現在、適用ルールは登録されていません。下から追加してください。</p>'; 
           updateMatrixTable();
+          refreshOverduePreview();
           return;
         }
         systemRules.forEach((r, index) => {
@@ -398,7 +415,8 @@
           `;
           container.appendChild(card);
         });
-        updateMatrixTable(); 
+        updateMatrixTable();
+        refreshOverduePreview();
       }
 
       function addRule() {
@@ -459,6 +477,7 @@
             systemRules = rules; localStorage.setItem('v11_rules', JSON.stringify(rules)); renderRules();
           }
           updateMatrixTable();
+          if (parsedRecords.length > 0) refreshOverduePreview();
         }).loadRules();
       };
 
@@ -515,11 +534,118 @@
         reader.readAsArrayBuffer(file);
       });
 
+      function getCurrentSettings() {
+        return {
+          sendJ: document.getElementById('sendJ').checked,
+          sendH: document.getElementById('sendH').checked,
+          sendStaff: document.getElementById('sendStaff').checked,
+          subOverdue: document.getElementById('subOverdue').value,
+          tplOverdue: document.getElementById('tplOverdue').value,
+          subReminder: document.getElementById('subReminder').value,
+          tplReminder: document.getElementById('tplReminder').value
+        };
+      }
+
+      function escapeHtml(str) {
+        return String(str || "").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function escapeJsStr(str) {
+        return String(str || "").replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      }
+
+      function refreshOverduePreview() {
+        const previewEl = document.getElementById('overduePreviewSection');
+        if (!previewEl || parsedRecords.length === 0) return;
+
+        previewEl.innerHTML = '<p style="color:#7f8c8d; font-size:13px;">即時督促プレビューを読み込み中...</p>';
+
+        if (systemRules.length === 0) {
+          previewEl.innerHTML = `
+            <div class="preview-section">
+              <h2>即時督促メール送信プレビュー</h2>
+              <p style="color:#c0392b; font-size:13px;">詳細設定から名簿ルールを1つ以上登録すると、送信対象のプレビューが表示されます。</p>
+            </div>`;
+          return;
+        }
+
+        let payload = { records: parsedRecords, settings: getCurrentSettings(), rules: systemRules };
+        google.script.run
+          .withSuccessHandler(renderOverduePreview)
+          .withFailureHandler(function(err) {
+            previewEl.innerHTML = `<div class="preview-section"><p style="color:#c0392b;">プレビュー取得エラー: ${escapeHtml(err.message)}</p></div>`;
+          })
+          .previewOverdueMails(payload);
+      }
+
+      function renderOverduePreview(rows) {
+        const previewEl = document.getElementById('overduePreviewSection');
+        if (!previewEl) return;
+
+        let sendCount = rows.filter(r => r.willSend).length;
+        let skipCount = rows.filter(r => r.status === '送信不可').length;
+        let offCount = rows.filter(r => r.status === '対象外').length;
+
+        let html = `
+          <div class="preview-section">
+            <h2>即時督促メール送信プレビュー</h2>
+            <div class="preview-summary">
+              期限超過 ${rows.length}件 —
+              <span class="preview-status-send">送信予定 ${sendCount}件</span> /
+              <span class="preview-status-skip">送信不可 ${skipCount}件</span> /
+              <span class="preview-status-off">対象外 ${offCount}件</span>
+              <span style="font-size:11px; color:#7f8c8d; margin-left:8px;">（この一覧は印刷されません）</span>
+            </div>`;
+
+        if (rows.length === 0) {
+          html += '<p style="color:#7f8c8d; font-size:13px;">現在、即時督促の対象となる期限超過データはありません。</p></div>';
+          previewEl.innerHTML = html;
+          return;
+        }
+
+        html += `<table class="preview-table"><thead><tr>
+          <th>ステータス</th><th>宛先氏名（名簿）</th><th>貸出データ氏名</th><th>クラス</th>
+          <th>書籍名</th><th>貸出日</th><th>返却期限</th><th>貸出年度</th><th>参照名簿</th><th>メール</th>
+        </tr></thead><tbody>`;
+
+        rows.forEach(r => {
+          let statusClass = r.status === '送信予定' ? 'preview-status-send' : (r.status === '対象外' ? 'preview-status-off' : 'preview-status-skip');
+          let statusText = r.statusDetail ? `${r.status}（${r.statusDetail}）` : r.status;
+
+          let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
+          let borrowNameHtml = escapeHtml(r.borrowName);
+          if (r.isStaff && r.statusDetail === 'メール未登録') {
+            borrowNameHtml = `<span class="staff-link" onclick="registerStaffPrompt('${escapeJsStr(r.id)}', '${escapeJsStr(r.borrowName)}')">${escapeHtml(r.borrowName)}</span>`;
+          }
+
+          let nameDiffClass = (r.rosterName && r.borrowName && r.rosterName.replace(/[\s　]+/g, '') !== r.borrowName.replace(/[\s　]+/g, '')) ? ' preview-name-diff' : '';
+
+          html += `<tr>
+            <td class="${statusClass}">${escapeHtml(statusText)}</td>
+            <td class="${nameDiffClass}">${rosterNameHtml}</td>
+            <td>${borrowNameHtml}</td>
+            <td>${escapeHtml(r.classInfo)}</td>
+            <td>${escapeHtml(r.title)}</td>
+            <td>${escapeHtml(r.borrowDate)}</td>
+            <td>${escapeHtml(r.dueDate)}</td>
+            <td>${escapeHtml(r.nendo)}</td>
+            <td>${escapeHtml(r.rosterSheet)}</td>
+            <td>${r.email ? escapeHtml(r.email) : '<span style="color:#999;">—</span>'}</td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        previewEl.innerHTML = html;
+      }
+
       function registerStaffPrompt(id, name) {
         let email = prompt(`${name} 先生のメールアドレスを登録・変更しますか？\nアドレスを入力してください:`);
         if (email !== null) {
           if (email.trim() === "") return alert("アドレスが入力されていません。");
-          google.script.run.withSuccessHandler(msg => alert(msg)).withFailureHandler(err => alert("エラー: " + err.message)).registerStaffEmail(id, name, email.trim());
+          google.script.run.withSuccessHandler(function(msg) {
+            alert(msg);
+            renderPrintLayout();
+          }).withFailureHandler(err => alert("エラー: " + err.message)).registerStaffEmail(id, name, email.trim());
         }
       }
 
@@ -537,7 +663,17 @@
       // 年度別のセクション分割と描画処理（印刷時は年度ごとに改ページ）
       function renderPrintLayout() {
         const printSection = document.getElementById('printSection'); 
-        printSection.innerHTML = ''; 
+        printSection.innerHTML = '';
+
+        let previewDiv = document.createElement('div');
+        previewDiv.id = 'overduePreviewSection';
+        previewDiv.className = 'no-print';
+        printSection.appendChild(previewDiv);
+
+        let printableDiv = document.createElement('div');
+        printableDiv.id = 'printableListsSection';
+        printSection.appendChild(printableDiv);
+
         let today = new Date(); today.setHours(0,0,0,0);
         let overdueRecords = []; let futureRecords = [];
 
@@ -555,14 +691,14 @@
           listHeader.innerText = listTitle;
           listHeader.style.color = titleColor;
           listHeader.style.borderBottomColor = borderColor;
-          printSection.appendChild(listHeader);
+          printableDiv.appendChild(listHeader);
 
           if (records.length === 0) {
             let noData = document.createElement('div');
             noData.style.marginBottom = '30px';
             noData.style.color = '#7f8c8d';
             noData.innerText = `現在、${statusLabel}対象のデータはありません。`;
-            printSection.appendChild(noData);
+            printableDiv.appendChild(noData);
             return;
           }
 
@@ -592,12 +728,13 @@
             let groupedClasses = groupRecordsByClass(nendoRecords);
             buildSectionHtml(groupedClasses, nendoSection, statusLabel);
 
-            printSection.appendChild(nendoSection);
+            printableDiv.appendChild(nendoSection);
           });
         }
 
         buildNendoSections(overdueRecords, '督促', '督促対象リスト');
         buildNendoSections(futureRecords, '予約', '自動予約対象リスト');
+        refreshOverduePreview();
       }
 
       function groupRecordsByClass(records) {
@@ -659,17 +796,15 @@
         if(systemRules.length === 0) return alert('⚠️ 詳細設定から適用ルールを1つ以上登録してください。');
         if (!confirm('【即時督促の送信】および【予約キューの最新化】を実行します。よろしいですか？')) return;
 
-        let currentSettings = {
-          sendJ: document.getElementById('sendJ').checked, sendH: document.getElementById('sendH').checked, sendStaff: document.getElementById('sendStaff').checked,
-          subOverdue: document.getElementById('subOverdue').value, tplOverdue: document.getElementById('tplOverdue').value,
-          subReminder: document.getElementById('subReminder').value, tplReminder: document.getElementById('tplReminder').value
-        };
+        let currentSettings = getCurrentSettings();
         localStorage.setItem('v11_settings', JSON.stringify(currentSettings));
         document.getElementById('sendBtn').disabled = true;
 
         let payload = { records: parsedRecords, settings: currentSettings, rules: systemRules };
         google.script.run.withSuccessHandler(function(msg) {
-          alert("処理が完了しました！\n\n" + msg); document.getElementById('sendBtn').disabled = false;
+          alert("処理が完了しました！\n\n" + msg);
+          document.getElementById('sendBtn').disabled = false;
+          refreshOverduePreview();
         }).withFailureHandler(function(err) {
           alert('エラー: ' + err.message); document.getElementById('sendBtn').disabled = false;
         }).processMails(payload);
