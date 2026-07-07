@@ -86,7 +86,6 @@
           <label style="display:block; font-size:13px; font-weight:bold; margin-bottom:5px;">名簿設定（UI登録）</label>
           <div style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
             <select id="rosterSelect" onchange="loadRosterEditorFromSelect()" style="min-width:260px;"></select>
-            <button type="button" class="btn btn-primary" style="padding:6px 10px; font-size:12px;" onclick="newRosterConfig()">新規名簿</button>
             <button type="button" class="btn btn-primary" style="padding:6px 10px; font-size:12px;" onclick="applyRosterEditor()">この内容を反映</button>
             <button type="button" class="btn btn-primary" style="padding:6px 10px; font-size:12px; background:#e67e22;" onclick="deleteCurrentRoster()">選択名簿を削除</button>
             <button type="button" class="btn btn-success" style="padding:6px 10px; font-size:12px;" onclick="saveRosterConfigs()">名簿設定を保存</button>
@@ -94,7 +93,6 @@
           </div>
           <div class="roster-card">
             <div class="roster-grid">
-              <div><label>名簿名</label><input id="editor_name" type="text"></div>
               <div><label>シートタブ</label><select id="editor_sheetName" onchange="onEditorSheetOrHeaderChanged()"></select></div>
               <div><label>見出し行</label><input id="editor_headerRow" type="number" min="1" value="1" onchange="onEditorSheetOrHeaderChanged()"></div>
               <div><label>ID方式</label><select id="editor_idMode" onchange="toggleEditorIdMode()"><option value="direct">4桁ID直接</option><option value="parts">学年・組・番号から生成</option></select></div>
@@ -105,8 +103,16 @@
               <div><label>氏名見出し</label><select id="editor_nameHeader"></select></div>
               <div><label>メール見出し</label><select id="editor_emailHeader"></select></div>
               <div><label>開始西暦</label><input id="editor_startYear" type="number" min="2000" max="2100" onchange="onEditorStartYearChanged()"></div>
-              <div><label>開始日</label><input id="editor_startDate" type="text" readonly></div>
-              <div><label>終了日</label><input id="editor_endDate" type="text" readonly></div>
+              <div>
+                <label>開始日（8桁 or カレンダー）</label>
+                <input id="editor_startDate" type="text" placeholder="YYYYMMDD or YYYY/MM/DD" onchange="onDateTextChanged('start')">
+                <input id="editor_startDatePicker" type="date" onchange="onDatePickerChanged('start')">
+              </div>
+              <div>
+                <label>終了日（8桁 or カレンダー）</label>
+                <input id="editor_endDate" type="text" placeholder="YYYYMMDD or YYYY/MM/DD" onchange="onDateTextChanged('end')">
+                <input id="editor_endDatePicker" type="date" onchange="onDatePickerChanged('end')">
+              </div>
             </div>
           </div>
           <div style="overflow-x:auto; margin-top:8px;">
@@ -168,8 +174,38 @@
       </div>
 
       <div class="section no-print">
-        <h3>4. 予定督促メール一覧プレビュー（1行1件）</h3>
+        <h3>4. 督促メール一覧プレビュー（1行1件）</h3>
         <div id="previewSummary" style="font-size:12px; color:#666;">ファイル読み込み後に表示されます。</div>
+        <div class="flex-group" style="margin-top:8px;">
+          <div class="form-item">
+            <label>ステータス</label>
+            <select id="filterStatus">
+              <option value="">すべて</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label>区分</label>
+            <select id="filterCategory">
+              <option value="">すべて</option>
+              <option value="中学校">中学校</option>
+              <option value="高校">高校</option>
+              <option value="STAFF">STAFF</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label>年度基準</label>
+            <select id="filterYearBase">
+              <option value="borrow">貸出日年度</option>
+              <option value="due">返却日年度</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label>年度</label>
+            <select id="filterYear">
+              <option value="">すべて</option>
+            </select>
+          </div>
+        </div>
         <div style="overflow-x:auto;">
           <table class="preview-table" id="previewTable">
             <thead>
@@ -239,6 +275,7 @@
         document.getElementById('tplReminder').value = defTplReminder;
         staffOverridesMap = parseStaffOverridesText(document.getElementById('staffOverrides').value);
         bindSortEvents();
+        bindFilterEvents();
         loadRosterMetaAndConfigs();
 
         let localSettings = localStorage.getItem('v7_settings');
@@ -540,6 +577,7 @@
 
       function drawPreviewTable(rows) {
         previewRows = rows.slice();
+        refreshFilterOptions();
         renderSortedPreviewRows();
       }
 
@@ -547,8 +585,9 @@
         const tbody = document.querySelector('#previewTable tbody');
         const summary = document.getElementById('previewSummary');
         tbody.innerHTML = '';
-        const rows = sortPreviewRows(previewRows);
-        summary.innerText = `一覧件数: ${rows.length}件（1行1件で全件表示）`;
+        const filtered = getFilteredPreviewRows(previewRows);
+        const rows = sortPreviewRows(filtered);
+        summary.innerText = `一覧件数: ${rows.length}件 / 全${previewRows.length}件（督促メール対象のみ）`;
         rows.forEach(r => {
           let tr = document.createElement('tr');
           const nameCell = renderRecipientCell(r);
@@ -623,6 +662,64 @@
         });
       }
 
+      function bindFilterEvents() {
+        ['filterStatus', 'filterCategory', 'filterYearBase', 'filterYear'].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener('change', function() {
+            if (id === 'filterYearBase') refreshYearOptions();
+            renderSortedPreviewRows();
+          });
+        });
+      }
+
+      function refreshFilterOptions() {
+        refreshStatusOptions();
+        refreshYearOptions();
+      }
+
+      function refreshStatusOptions() {
+        const select = document.getElementById('filterStatus');
+        const current = select.value;
+        const statuses = Array.from(new Set(previewRows.map(r => r.deliveryStatus || '').filter(Boolean)));
+        select.innerHTML = '<option value="">すべて</option>' + statuses.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        select.value = statuses.includes(current) ? current : '';
+      }
+
+      function refreshYearOptions() {
+        const select = document.getElementById('filterYear');
+        const current = select.value;
+        const base = document.getElementById('filterYearBase').value;
+        const years = Array.from(new Set(previewRows.map(r => getYearByBase(r, base)).filter(Boolean))).sort();
+        select.innerHTML = '<option value="">すべて</option>' + years.map(y => `<option value="${escapeHtml(y)}">${escapeHtml(y)}年度</option>`).join('');
+        select.value = years.includes(current) ? current : '';
+      }
+
+      function getFilteredPreviewRows(rows) {
+        const status = document.getElementById('filterStatus').value;
+        const category = document.getElementById('filterCategory').value;
+        const year = document.getElementById('filterYear').value;
+        const yearBase = document.getElementById('filterYearBase').value;
+        return rows.filter(r => {
+          if (status && (r.deliveryStatus || '') !== status) return false;
+          if (category && normalizeCategoryLabel(r.category) !== category) return false;
+          if (year && getYearByBase(r, yearBase) !== year) return false;
+          return true;
+        });
+      }
+
+      function normalizeCategoryLabel(category) {
+        if (category === '中学生') return '中学校';
+        if (category === '高校生') return '高校';
+        return 'STAFF';
+      }
+
+      function getYearByBase(row, base) {
+        const dateStr = base === 'due' ? row.dueDate : row.borrowDate;
+        const y = String(dateStr || '').split('/')[0];
+        return /^\d{4}$/.test(y) ? y : '';
+      }
+
       function sortPreviewRows(rows) {
         if (!sortState.key) return rows;
         const key = sortState.key;
@@ -678,30 +775,36 @@
       function refreshRosterEditorUi(selectedIndex) {
         const select = document.getElementById('rosterSelect');
         select.innerHTML = '';
+        const newOption = document.createElement('option');
+        newOption.value = '__new__';
+        newOption.textContent = '＜名簿新規登録＞';
+        select.appendChild(newOption);
         rosterConfigsUi.forEach((r, i) => {
           const op = document.createElement('option');
           op.value = String(i);
           op.textContent = `${i + 1}. ${r.name || '(未設定名簿)'}`;
           select.appendChild(op);
         });
-        if (selectedIndex < 0 || selectedIndex >= rosterConfigsUi.length) selectedIndex = 0;
-        if (rosterConfigsUi.length) {
+        if (selectedIndex < 0 || selectedIndex >= rosterConfigsUi.length) {
+          select.value = '__new__';
+        } else {
           select.value = String(selectedIndex);
-          loadRosterEditorFromSelect();
         }
+        loadRosterEditorFromSelect();
         renderRosterSummary();
       }
 
       function loadRosterEditorFromSelect() {
-        const idx = Number(document.getElementById('rosterSelect').value || 0);
-        const r = rosterConfigsUi[idx] || buildDefaultRosterRow();
-        document.getElementById('editor_name').value = r.name || '';
+        const selected = document.getElementById('rosterSelect').value;
+        const r = selected === '__new__' ? buildDefaultRosterRow() : (rosterConfigsUi[Number(selected)] || buildDefaultRosterRow());
         populateSheetSelect(r.sheetName || '');
         document.getElementById('editor_headerRow').value = r.headerRow || 1;
         document.getElementById('editor_idMode').value = r.idMode || 'direct';
         document.getElementById('editor_startYear').value = r.startYear || rosterMeta.currentYear;
         document.getElementById('editor_startDate').value = r.startDate || `${rosterMeta.currentYear}/04/01`;
         document.getElementById('editor_endDate').value = r.endDate || `${Number(rosterMeta.currentYear) + 1}/03/31`;
+        syncDatePickerFromText('start');
+        syncDatePickerFromText('end');
         onEditorSheetOrHeaderChanged(() => {
           setSelectValue('editor_idHeader', r.idHeader || '');
           setSelectValue('editor_gradeHeader', r.gradeHeader || '');
@@ -711,49 +814,69 @@
           setSelectValue('editor_emailHeader', r.emailHeader || '');
           toggleEditorIdMode();
         });
-      }
-
-      function newRosterConfig() {
-        rosterConfigsUi.push(buildDefaultRosterRow());
-        refreshRosterEditorUi(rosterConfigsUi.length - 1);
+        document.querySelector('button[onclick="deleteCurrentRoster()"]').disabled = selected === '__new__';
       }
 
       function deleteCurrentRoster() {
-        const idx = Number(document.getElementById('rosterSelect').value || 0);
+        const selected = document.getElementById('rosterSelect').value;
+        if (selected === '__new__') return;
+        const idx = Number(selected || 0);
         if (!rosterConfigsUi.length) return;
         rosterConfigsUi.splice(idx, 1);
-        if (!rosterConfigsUi.length) rosterConfigsUi = [buildDefaultRosterRow()];
-        refreshRosterEditorUi(Math.max(0, idx - 1));
+        refreshRosterEditorUi(rosterConfigsUi.length ? Math.max(0, idx - 1) : -1);
       }
 
       function applyRosterEditor() {
-        const idx = Number(document.getElementById('rosterSelect').value || 0);
+        const selected = document.getElementById('rosterSelect').value;
         const row = collectRosterEditorConfig();
-        rosterConfigsUi[idx] = row;
-        refreshRosterEditorUi(idx);
+        if (selected === '__new__') {
+          rosterConfigsUi.push(row);
+          refreshRosterEditorUi(rosterConfigsUi.length - 1);
+        } else {
+          const idx = Number(selected || 0);
+          rosterConfigsUi[idx] = row;
+          refreshRosterEditorUi(idx);
+        }
         document.getElementById('rosterSaveStatus').innerText = '編集中リストへ反映しました（保存は未実施）。';
       }
 
       function syncEditorToSelected() {
-        const idx = Number(document.getElementById('rosterSelect').value || 0);
-        if (!rosterConfigsUi.length) return;
+        const selected = document.getElementById('rosterSelect').value;
+        if (selected === '__new__') return;
+        const idx = Number(selected || 0);
+        if (!rosterConfigsUi.length || idx < 0 || idx >= rosterConfigsUi.length) return;
         rosterConfigsUi[idx] = collectRosterEditorConfig();
         renderRosterSummary();
       }
 
       function saveRosterConfigs() {
         syncEditorToSelected();
+        if (document.getElementById('rosterSelect').value === '__new__') {
+          const draft = collectRosterEditorConfig();
+          const hasDraft = draft.sheetName || draft.emailHeader || draft.idHeader || draft.gradeHeader;
+          if (hasDraft) rosterConfigsUi.push(draft);
+        }
         const rows = rosterConfigsUi.slice();
         if (!rows.length) {
           alert('保存する名簿設定がありません。');
           return;
+        }
+        for (let i = 0; i < rows.length; i++) {
+          if (!String(rows[i].name || '').trim()) {
+            const inputName = prompt(`名簿 ${i + 1} の名簿名を入力してください`, `${rows[i].startYear || rosterMeta.currentYear}年度名簿`);
+            if (inputName === null || !String(inputName).trim()) {
+              alert('名簿名が未入力のため保存を中止しました。');
+              return;
+            }
+            rows[i].name = String(inputName).trim();
+          }
         }
         document.getElementById('rosterSaveStatus').innerText = '保存中...';
         google.script.run
           .withSuccessHandler(function(msg) {
             document.getElementById('rosterSaveStatus').innerText = msg;
             rosterConfigsUi = rows;
-            refreshRosterEditorUi(Number(document.getElementById('rosterSelect').value || 0));
+            refreshRosterEditorUi(0);
           })
           .withFailureHandler(function(err) {
             document.getElementById('rosterSaveStatus').innerText = '保存エラー: ' + err.message;
@@ -765,6 +888,40 @@
         const y = Number(document.getElementById('editor_startYear').value || rosterMeta.currentYear || new Date().getFullYear());
         document.getElementById('editor_startDate').value = `${y}/04/01`;
         document.getElementById('editor_endDate').value = `${y + 1}/03/31`;
+        syncDatePickerFromText('start');
+        syncDatePickerFromText('end');
+      }
+
+      function onDateTextChanged(kind) {
+        syncDatePickerFromText(kind);
+      }
+
+      function onDatePickerChanged(kind) {
+        const picker = document.getElementById(kind === 'start' ? 'editor_startDatePicker' : 'editor_endDatePicker');
+        const text = document.getElementById(kind === 'start' ? 'editor_startDate' : 'editor_endDate');
+        const value = String(picker.value || '').trim();
+        if (!value) return;
+        text.value = value.replace(/-/g, '/');
+      }
+
+      function syncDatePickerFromText(kind) {
+        const text = document.getElementById(kind === 'start' ? 'editor_startDate' : 'editor_endDate');
+        const picker = document.getElementById(kind === 'start' ? 'editor_startDatePicker' : 'editor_endDatePicker');
+        const normalized = normalizeDateText(text.value);
+        if (!normalized) return;
+        text.value = normalized;
+        picker.value = normalized.replace(/\//g, '-');
+      }
+
+      function normalizeDateText(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^\d{8}$/.test(raw)) {
+          return `${raw.substring(0,4)}/${raw.substring(4,6)}/${raw.substring(6,8)}`;
+        }
+        const m = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (!m) return '';
+        return `${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
       }
 
       function onEditorSheetOrHeaderChanged(callback) {
@@ -798,8 +955,10 @@
 
       function collectRosterEditorConfig() {
         const getValue = (id) => String(document.getElementById(id).value || '').trim();
+        const startDate = normalizeDateText(getValue('editor_startDate')) || getValue('editor_startDate');
+        const endDate = normalizeDateText(getValue('editor_endDate')) || getValue('editor_endDate');
         return {
-          name: getValue('editor_name'),
+          name: "",
           sheetName: getValue('editor_sheetName'),
           headerRow: getValue('editor_headerRow') || '1',
           idMode: getValue('editor_idMode') || 'direct',
@@ -811,8 +970,8 @@
           emailHeader: getValue('editor_emailHeader'),
           categoryHeader: '',
           startYear: getValue('editor_startYear'),
-          startDate: getValue('editor_startDate'),
-          endDate: getValue('editor_endDate')
+          startDate: startDate,
+          endDate: endDate
         };
       }
 

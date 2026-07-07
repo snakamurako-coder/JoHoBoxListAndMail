@@ -402,11 +402,12 @@ function getScheduledPreview(payload) {
 
     resolvedRecords.forEach(r => {
       const dueDate = parseYmdDate(r.dueDate);
+      if (!dueDate || !(dueDate < today)) return;
       const isAllowed = (r.classInfo.includes("中学") && String(settings.sendJ) === "true") ||
         (r.classInfo.includes("高校") && String(settings.sendH) === "true") ||
         ((!r.classInfo.match(/(中学|高校)/)) && String(settings.sendStaff) === "true");
 
-      const status = dueDate && dueDate < today ? "督促（期限超過）" : "予約（前日通知対象）";
+      const status = "督促（期限超過）";
       const recipientName = r.resolvedName || r.name;
       let deliveryStatus = "";
       let warning = "";
