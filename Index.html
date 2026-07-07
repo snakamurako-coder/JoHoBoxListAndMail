@@ -89,6 +89,15 @@
       .preview-table th.sort-active .sort-ind { color: #c0392b; font-weight: bold; }
       .preview-filtered-count { font-size: 12px; color: #7f8c8d; }
 
+      /* 印刷用フィルタ */
+      .print-filter-panel { margin-bottom: 20px; padding: 15px; background: #f0f7ff; border: 1px solid #aed0f0; border-radius: 6px; }
+      .print-filter-panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #2c3e50; }
+      .print-filter-summary { font-size: 13px; color: #555; margin-bottom: 10px; }
+      .print-preset-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+      .print-preset-btn { padding: 5px 12px; font-size: 12px; border: 1px solid #3498db; background: white; color: #2980b9; border-radius: 4px; cursor: pointer; }
+      .print-preset-btn:hover { background: #ebf5fb; }
+      .print-filter-banner { display: none; font-size: 14px; font-weight: bold; margin-bottom: 15px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; }
+
       @media print {
         body * { visibility: hidden; }
         #printSection, #printSection * { visibility: visible; }
@@ -100,6 +109,7 @@
         .col-table { font-size: 12px; }
         .col-table th, .col-table td { padding: 4px; }
         .staff-link { text-decoration: none; color: inherit; }
+        .print-filter-banner { display: block !important; }
         @page { margin: 15mm; }
       }
     </style>
@@ -143,7 +153,7 @@
 
       <div style="margin-bottom: 20px;" class="no-print">
         <button class="btn btn-primary" id="sendBtn" onclick="executeMails()" disabled style="margin-right: 15px; font-size: 16px; padding: 12px 24px;">一括処理を実行（即時督促 ＋ 予約更新）</button>
-        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled style="font-size: 16px; padding: 12px 24px;">年度別リストを印刷する</button>
+        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled style="font-size: 16px; padding: 12px 24px;">絞り込んで印刷する</button>
       </div>
 
       <hr class="no-print" style="border:1px solid #eee; margin:30px 0;">
@@ -243,7 +253,7 @@
       </div>
 
       <div id="printSection">
-        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むとここに年度別の督促・自動予約リストが生成されます</div>
+        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むと、プレビューと印刷用リスト（年度・区分で絞り込み可）が生成されます</div>
       </div>
     </div>
 
@@ -256,6 +266,14 @@
         sortCol: 'borrowDate',
         sortDir: -1,
         statuses: ['送信予定', '送信不可', '対象外'],
+        categories: ['中学', '高校', '職員'],
+        combineMode: 'and'
+      };
+      let printOverdueRecords = [];
+      let printFutureRecords = [];
+      let printAvailableNendos = [];
+      let printViewState = {
+        nendos: [],
         categories: ['中学', '高校', '職員'],
         combineMode: 'and'
       };
@@ -831,7 +849,7 @@
           if (email.trim() === "") return alert("アドレスが入力されていません。");
           google.script.run.withSuccessHandler(function(msg) {
             alert(msg);
-            renderPrintLayout();
+            refreshOverduePreview();
           }).withFailureHandler(err => alert("エラー: " + err.message)).registerStaffEmail(id, name, email.trim());
         }
       }
@@ -847,6 +865,228 @@
         return (classInfo.includes("中学") ? "1_" : "2_") + id;
       }
 
+      function getCurrentNendo() {
+        const now = new Date();
+        let y = now.getFullYear();
+        let m = now.getMonth() + 1;
+        return m <= 3 ? y - 1 : y;
+      }
+
+      function getRecordCategory(r) {
+        if (r.generatedId && r.generatedId.startsWith('STAFF')) return '職員';
+        if (r.classInfo && r.classInfo.includes('高校')) return '高校';
+        if (r.classInfo && r.classInfo.includes('中学')) return '中学';
+        return 'その他';
+      }
+
+      function getAvailableNendos(records) {
+        let set = new Set();
+        records.forEach(r => { if (r.nendo !== undefined && r.nendo !== null && r.nendo !== '') set.add(String(r.nendo)); });
+        return Array.from(set).sort((a, b) => {
+          if (a === '不明') return 1;
+          if (b === '不明') return -1;
+          return parseInt(b, 10) - parseInt(a, 10);
+        });
+      }
+
+      function filterPrintRecords(records) {
+        const s = printViewState;
+        const nendoActive = s.nendos.length > 0;
+        const catActive = s.categories.length > 0;
+
+        return records.filter(r => {
+          const matchNendo = s.nendos.includes(String(r.nendo));
+          const matchCat = s.categories.includes(getRecordCategory(r));
+
+          if (!nendoActive && !catActive) return true;
+          if (s.combineMode === 'and') {
+            if (nendoActive && catActive) return matchNendo && matchCat;
+            if (nendoActive) return matchNendo;
+            return matchCat;
+          }
+          return (nendoActive && matchNendo) || (catActive && matchCat);
+        });
+      }
+
+      function getPrintFilterSummary() {
+        const s = printViewState;
+        const nendoLabel = s.nendos.length > 0 ? s.nendos.map(n => n + '年度').join('・') : '全年度';
+        const catMap = { '中学': '中学生', '高校': '高校生', '職員': '職員・教職員' };
+        const catLabel = s.categories.length > 0 ? s.categories.map(c => catMap[c] || c).join('・') : '全区分';
+        const combineLabel = s.combineMode === 'and' ? 'かつ' : 'または';
+        if (s.nendos.length > 0 && s.categories.length > 0) {
+          return `${nendoLabel} ${combineLabel} ${catLabel}`;
+        }
+        return nendoLabel + ' / ' + catLabel;
+      }
+
+      function readPrintFilterStateFromDom() {
+        printViewState.nendos = Array.from(document.querySelectorAll('.pf-nendo:checked')).map(el => el.value);
+        printViewState.categories = Array.from(document.querySelectorAll('.pf-print-cat:checked')).map(el => el.value);
+        const combineEl = document.querySelector('input[name="pf-print-combine"]:checked');
+        if (combineEl) printViewState.combineMode = combineEl.value;
+      }
+
+      function onPrintFilterChange() {
+        readPrintFilterStateFromDom();
+        renderPrintFilterPanel();
+        renderPrintableLists();
+      }
+
+      function resetPrintFilters() {
+        printViewState.nendos = printAvailableNendos.slice();
+        printViewState.categories = ['中学', '高校', '職員'];
+        printViewState.combineMode = 'and';
+        renderPrintFilterPanel();
+        renderPrintableLists();
+      }
+
+      function applyPrintPreset(preset) {
+        const cur = String(getCurrentNendo());
+        if (preset === 'all') {
+          printViewState.nendos = printAvailableNendos.slice();
+          printViewState.categories = ['中学', '高校', '職員'];
+        } else if (preset === 'cur') {
+          printViewState.nendos = [cur];
+          printViewState.categories = ['中学', '高校', '職員'];
+        } else if (preset === 'cur_j') {
+          printViewState.nendos = [cur];
+          printViewState.categories = ['中学'];
+        } else if (preset === 'cur_h') {
+          printViewState.nendos = [cur];
+          printViewState.categories = ['高校'];
+        } else if (preset === 'cur_s') {
+          printViewState.nendos = [cur];
+          printViewState.categories = ['職員'];
+        }
+        printViewState.combineMode = 'and';
+        renderPrintFilterPanel();
+        renderPrintableLists();
+      }
+
+      function renderPrintFilterPanel() {
+        const panelEl = document.getElementById('printFilterSection');
+        if (!panelEl) return;
+
+        const s = printViewState;
+        const filteredCount = filterPrintRecords(printOverdueRecords).length + filterPrintRecords(printFutureRecords).length;
+        const totalCount = printOverdueRecords.length + printFutureRecords.length;
+        const cur = String(getCurrentNendo());
+
+        let nendoChecks = printAvailableNendos.map(n => {
+          let lbl = n === cur ? `${n}年度（今年度）` : `${n}年度`;
+          if (n === '不明') lbl = '不明';
+          return `<label><input type="checkbox" class="pf-nendo" value="${escapeHtml(n)}" ${s.nendos.includes(n) ? 'checked' : ''} onchange="onPrintFilterChange()"> ${lbl}</label>`;
+        }).join('');
+
+        panelEl.innerHTML = `
+          <div class="print-filter-panel no-print">
+            <h3>印刷用フィルタ（年度・区分）</h3>
+            <div class="print-filter-summary">
+              条件: <strong>${escapeHtml(getPrintFilterSummary())}</strong>
+              <span class="preview-filtered-count">　｜　表示 ${filteredCount} / 全 ${totalCount}件</span>
+            </div>
+            <div class="print-preset-btns">
+              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_j')">今年度・中学生</button>
+              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_h')">今年度・高校生</button>
+              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur_s')">今年度・職員</button>
+              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('cur')">今年度のみ</button>
+              <button type="button" class="print-preset-btn" onclick="applyPrintPreset('all')">すべて表示</button>
+              <button type="button" class="preview-reset-btn" onclick="resetPrintFilters()">リセット</button>
+            </div>
+            <div class="preview-filter-row">
+              <div class="preview-filter-group">
+                <strong>貸出年度</strong>
+                ${nendoChecks || '<span style="color:#999;">データなし</span>'}
+              </div>
+            </div>
+            <div class="preview-filter-row">
+              <div class="preview-filter-group">
+                <strong>区分</strong>
+                <label><input type="checkbox" class="pf-print-cat" value="中学" ${s.categories.includes('中学') ? 'checked' : ''} onchange="onPrintFilterChange()"> 中学生</label>
+                <label><input type="checkbox" class="pf-print-cat" value="高校" ${s.categories.includes('高校') ? 'checked' : ''} onchange="onPrintFilterChange()"> 高校生</label>
+                <label><input type="checkbox" class="pf-print-cat" value="職員" ${s.categories.includes('職員') ? 'checked' : ''} onchange="onPrintFilterChange()"> 職員・教職員</label>
+              </div>
+              <div class="preview-filter-group">
+                <strong>条件の結合</strong>
+                <div class="preview-combine-toggle">
+                  <label><input type="radio" name="pf-print-combine" value="and" ${s.combineMode === 'and' ? 'checked' : ''} onchange="onPrintFilterChange()">AND</label>
+                  <label><input type="radio" name="pf-print-combine" value="or" ${s.combineMode === 'or' ? 'checked' : ''} onchange="onPrintFilterChange()">OR</label>
+                </div>
+                <span style="font-size:11px; color:#7f8c8d;">（年度条件と区分条件の結合方法）</span>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      function renderPrintableLists() {
+        const printableDiv = document.getElementById('printableListsSection');
+        if (!printableDiv) return;
+        printableDiv.innerHTML = '';
+
+        let banner = document.createElement('div');
+        banner.className = 'print-filter-banner';
+        banner.innerText = '印刷条件: ' + getPrintFilterSummary();
+        printableDiv.appendChild(banner);
+
+        const filteredOverdue = filterPrintRecords(printOverdueRecords);
+        const filteredFuture = filterPrintRecords(printFutureRecords);
+
+        buildNendoSections(filteredOverdue, '督促', '督促対象リスト', printableDiv);
+        buildNendoSections(filteredFuture, '予約', '自動予約対象リスト', printableDiv);
+      }
+
+      function buildNendoSections(records, statusLabel, listTitle, container) {
+        let titleColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
+        let borderColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
+
+        if (records.length === 0) {
+          let noData = document.createElement('div');
+          noData.className = 'no-print';
+          noData.style.marginBottom = '30px';
+          noData.style.color = '#7f8c8d';
+          noData.innerText = `現在、${statusLabel}対象でフィルタ条件に一致するデータはありません。`;
+          container.appendChild(noData);
+          return;
+        }
+
+        let listHeader = document.createElement('h2');
+        listHeader.className = 'list-type-header';
+        listHeader.innerText = listTitle;
+        listHeader.style.color = titleColor;
+        listHeader.style.borderBottomColor = borderColor;
+        container.appendChild(listHeader);
+
+        let byNendo = {};
+        records.forEach(r => {
+          if (!byNendo[r.nendo]) byNendo[r.nendo] = [];
+          byNendo[r.nendo].push(r);
+        });
+
+        let nendos = Object.keys(byNendo).sort((a, b) => {
+          if (a === "不明") return 1;
+          if (b === "不明") return -1;
+          return b - a;
+        });
+
+        nendos.forEach(nendo => {
+          let nendoRecords = byNendo[nendo];
+          let nendoSection = document.createElement('div');
+          nendoSection.className = 'nendo-section';
+
+          let nendoTitle = document.createElement('h3');
+          nendoTitle.className = 'nendo-title';
+          nendoTitle.innerText = `${nendo}年度（貸出分 ${nendoRecords.length}件）`;
+          nendoTitle.style.borderLeftColor = borderColor;
+          nendoSection.appendChild(nendoTitle);
+
+          let groupedClasses = groupRecordsByClass(nendoRecords);
+          buildSectionHtml(groupedClasses, nendoSection, statusLabel);
+
+          container.appendChild(nendoSection);
+        });
+      }
+
       // 年度別のセクション分割と描画処理（印刷時は年度ごとに改ページ）
       function renderPrintLayout() {
         const printSection = document.getElementById('printSection'); 
@@ -857,70 +1097,36 @@
         previewDiv.className = 'no-print';
         printSection.appendChild(previewDiv);
 
+        let filterDiv = document.createElement('div');
+        filterDiv.id = 'printFilterSection';
+        printSection.appendChild(filterDiv);
+
         let printableDiv = document.createElement('div');
         printableDiv.id = 'printableListsSection';
         printSection.appendChild(printableDiv);
 
         let today = new Date(); today.setHours(0,0,0,0);
-        let overdueRecords = []; let futureRecords = [];
 
+        printOverdueRecords = [];
+        printFutureRecords = [];
         parsedRecords.forEach(r => {
-          let dStr = r.dueDate.split('/'); let dueDate = new Date(dStr[0], dStr[1]-1, dStr[2]); dueDate.setHours(0,0,0,0);
-          if (dueDate < today) overdueRecords.push(r); else futureRecords.push(r);
+          let dStr = r.dueDate.split('/');
+          let dueDate = new Date(dStr[0], dStr[1]-1, dStr[2]);
+          dueDate.setHours(0,0,0,0);
+          if (dueDate < today) printOverdueRecords.push(r);
+          else printFutureRecords.push(r);
         });
 
-        function buildNendoSections(records, statusLabel, listTitle) {
-          let titleColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
-          let borderColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
-
-          let listHeader = document.createElement('h2');
-          listHeader.className = 'list-type-header';
-          listHeader.innerText = listTitle;
-          listHeader.style.color = titleColor;
-          listHeader.style.borderBottomColor = borderColor;
-          printableDiv.appendChild(listHeader);
-
-          if (records.length === 0) {
-            let noData = document.createElement('div');
-            noData.style.marginBottom = '30px';
-            noData.style.color = '#7f8c8d';
-            noData.innerText = `現在、${statusLabel}対象のデータはありません。`;
-            printableDiv.appendChild(noData);
-            return;
-          }
-
-          let byNendo = {};
-          records.forEach(r => {
-            if (!byNendo[r.nendo]) byNendo[r.nendo] = [];
-            byNendo[r.nendo].push(r);
-          });
-
-          let nendos = Object.keys(byNendo).sort((a, b) => {
-            if (a === "不明") return 1;
-            if (b === "不明") return -1;
-            return b - a;
-          });
-
-          nendos.forEach(nendo => {
-            let nendoRecords = byNendo[nendo];
-            let nendoSection = document.createElement('div');
-            nendoSection.className = 'nendo-section';
-
-            let nendoTitle = document.createElement('h3');
-            nendoTitle.className = 'nendo-title';
-            nendoTitle.innerText = `${nendo}年度（貸出分 ${nendoRecords.length}件）`;
-            nendoTitle.style.borderLeftColor = borderColor;
-            nendoSection.appendChild(nendoTitle);
-
-            let groupedClasses = groupRecordsByClass(nendoRecords);
-            buildSectionHtml(groupedClasses, nendoSection, statusLabel);
-
-            printableDiv.appendChild(nendoSection);
-          });
+        printAvailableNendos = getAvailableNendos([...printOverdueRecords, ...printFutureRecords]);
+        if (printViewState.nendos.length === 0 || !printViewState.nendos.some(n => printAvailableNendos.includes(n))) {
+          printViewState.nendos = printAvailableNendos.slice();
+        } else {
+          printViewState.nendos = printViewState.nendos.filter(n => printAvailableNendos.includes(n));
+          if (printViewState.nendos.length === 0) printViewState.nendos = printAvailableNendos.slice();
         }
 
-        buildNendoSections(overdueRecords, '督促', '督促対象リスト');
-        buildNendoSections(futureRecords, '予約', '自動予約対象リスト');
+        renderPrintFilterPanel();
+        renderPrintableLists();
         refreshOverduePreview();
       }
 
