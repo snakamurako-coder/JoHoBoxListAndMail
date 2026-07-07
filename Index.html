@@ -201,7 +201,7 @@
           <strong>【名簿管理の手順と注意事項】</strong><br>
           ① <strong>名簿の登録</strong>：Excel等から「学年・組・番号・メールアドレス」の表をコピーし、下の「A」欄に貼り付けてシートを作成します。<br>
           ② <strong>ルールの紐付け</strong>：追加したシートを選び、どの列がIDやアドレスに該当するかを選択します。同じ見出し名（例:学年）が複数あっても、自動で列アルファベットが付与されるので正確に選べます。<br>
-          ③ <strong>照合方法</strong>：貸出日の名簿ルールは<strong>設定した期間（開始〜終了）を最優先</strong>で判定し、一致した名簿で<strong>学年・組・番号</strong>（4桁ID）を照合します。図書データのクラスは「現在の学年」で表示されるため、貸出年度との差で学年を自動補正します。教職員は教職員名簿で照合します。<br>
+          ③ <strong>照合方法</strong>：貸出日の名簿ルールは<strong>設定した期間（開始〜終了）を最優先</strong>で判定し、一致した名簿で<strong>学年・組・番号</strong>（4桁ID）をそのまま照合します。教職員は教職員名簿で照合します。<br>
           ④ <strong>期間の微調整</strong>：4/1〜3/31固定でなくても問題ありません。学校運用（例：新年度通知日）に合わせて開始日・終了日を調整できます。<br>
           ⑤ <strong>年度の自動補完</strong>：開始日を選択すると終了日は初期値として「翌年の3月31日」が入ります。必要に応じて手動で上書きしてください。
         </div>
@@ -478,6 +478,16 @@
 
         if(!rule.start || !rule.end || !rule.sheetName || !rule.emailCol) return alert("「期間」「対象シート」「メール列」は必須です。");
         if(!rule.idCol && (!rule.gradeCol || !rule.classCol || !rule.numCol)) return alert("照合のため「4桁ID列」か、または「学年・組・番号の全3列」のどちらかを選択してください。");
+        let newStart = new Date(rule.start).getTime();
+        let newEnd = new Date(rule.end).getTime();
+        let overlap = systemRules.find(r => {
+          let s = new Date(r.start).getTime();
+          let e = new Date(r.end).getTime();
+          return !(newEnd < s || e < newStart);
+        });
+        if (overlap) {
+          return alert(`期間が重複しています。\n重複先: ${overlap.sheetName} (${overlap.start} ～ ${overlap.end})\n期間が重ならないように設定してください。`);
+        }
 
         systemRules.push(rule);
         localStorage.setItem('v11_rules', JSON.stringify(systemRules));
@@ -817,9 +827,6 @@
             let cat = getPreviewCategory(r);
 
             let matchIdHtml = r.isStaff ? 'STAFF' : escapeHtml(r.matchId || '—');
-            if (!r.isStaff && r.currentId && r.currentId !== r.matchId) {
-              matchIdHtml += ` <span style="font-size:10px;color:#d35400;" title="図書データの現在表示ID">(現在${escapeHtml(r.currentId)})</span>`;
-            }
             let rosterNameHtml = r.rosterName ? escapeHtml(r.rosterName) : '<span style="color:#999;">—</span>';
             let borrowNameHtml = escapeHtml(r.borrowName);
             if (r.isStaff && r.statusDetail === 'メール未登録') {

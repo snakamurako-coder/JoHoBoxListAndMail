@@ -172,20 +172,13 @@ function getNendoFromDateStr(dateStr) {
   return m <= 3 ? y - 1 : y;
 }
 
-function getCurrentNendo() {
-  const now = new Date();
-  let y = now.getFullYear();
-  let m = now.getMonth() + 1;
-  return m <= 3 ? y - 1 : y;
-}
-
 function parseRuleDate(dateStr) {
   let parts = String(dateStr).split(/[\/\-]/);
   return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
 }
 
 // 貸出日が属する名簿ルールを取得（期間設定を最優先）
-function findRuleForBorrowDate(rules, bDate, borrowDateStr) {
+function findRulesForBorrowDate(rules, bDate, borrowDateStr) {
   let matched = [];
   for (let i = 0; i < rules.length; i++) {
     let rule = rules[i];
@@ -197,9 +190,7 @@ function findRuleForBorrowDate(rules, bDate, borrowDateStr) {
     }
   }
   if (matched.length > 0) {
-    // 期間が重複している場合は、開始日が新しいルールを優先
-    matched.sort((a, b) => b.start - a.start);
-    return matched[0].rule;
+    return matched.map(x => x.rule);
   }
 
   // フォールバック: 貸出年度と開始年度が一致するルールを採用
@@ -207,25 +198,10 @@ function findRuleForBorrowDate(rules, bDate, borrowDateStr) {
   if (borrowNendo != null) {
     for (let i = 0; i < rules.length; i++) {
       let ruleNendo = getNendoFromDateStr(rules[i].start);
-      if (ruleNendo === borrowNendo) return rules[i];
+      if (ruleNendo === borrowNendo) return [rules[i]];
     }
   }
-  return null;
-}
-
-// 貸出年度の名簿照合用ID（図書データは現在学年のため、年度差で学年を補正）
-function getLookupId(classInfo, name, borrowNendo) {
-  let match = classInfo.match(/(中学|高校).*?(\d+)年([A-Za-z0-9]+)組(\d+)番/);
-  if (!match) return "STAFF_" + name.replace(/[\s ]+/g, "");
-
-  let currentGrade = parseInt(match[2], 10);
-  let cls = match[3];
-  let num = String(match[4]).padStart(2, '0');
-  let yearsDiff = getCurrentNendo() - borrowNendo;
-  let lookupGrade = currentGrade - yearsDiff;
-
-  if (lookupGrade < 1) lookupGrade = currentGrade;
-  return `${lookupGrade}${cls}${num}`;
+  return [];
 }
 
 // ルールに基づいて特定シートの名簿Mapを生成する（学年・組・番号の4桁IDで照合）
@@ -279,7 +255,7 @@ function buildMailPlan(records, settings, rules) {
     let isStaff = !r.classInfo.match(/(中学|高校)/);
     let borrowNendo = getNendoFromDateStr(r.borrowDate);
     let currentId = normalizeTo4DigitId(r.classInfo, r.name);
-    let lookupId = isStaff ? currentId : getLookupId(r.classInfo, r.name, borrowNendo);
+    let lookupId = currentId;
     r.id = lookupId;
 
     let bDateParts = r.borrowDate.split('/');
@@ -298,8 +274,12 @@ function buildMailPlan(records, settings, rules) {
       rosterName = staffInfo.name || r.name;
       ruleMatched = true;
     } else {
-      matchedRule = findRuleForBorrowDate(rules, bDate, r.borrowDate);
-      if (matchedRule) {
+      let matchedRules = findRulesForBorrowDate(rules, bDate, r.borrowDate);
+      if (matchedRules.length > 1) {
+        ruleMatched = false;
+        matchedRule = null;
+      } else if (matchedRules.length === 1) {
+        matchedRule = matchedRules[0];
         ruleMatched = true;
         let cacheKey = matchedRule.sheetName;
         if (!rosterCache[cacheKey]) {
@@ -328,6 +308,9 @@ function buildMailPlan(records, settings, rules) {
       if (!isAllowed) {
         status = "対象外";
         statusDetail = "送信設定オフ";
+      } else if (!isStaff && findRulesForBorrowDate(rules, bDate, r.borrowDate).length > 1) {
+        status = "送信不可";
+        statusDetail = "名簿ルール重複";
       } else if (!ruleMatched) {
         status = "送信不可";
         statusDetail = borrowNendo + "年度の名簿ルールなし";
@@ -364,6 +347,8 @@ function buildMailPlan(records, settings, rules) {
     if (!email) {
       if (isStaff) {
         missingEmails.add(`教職員: ${r.name} (プレビュー画面の氏名をクリックして登録可能)`);
+      } else if (findRulesForBorrowDate(rules, bDate, r.borrowDate).length > 1) {
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対して名簿ルールが重複しています。期間設定を見直してください)`);
       } else if (!ruleMatched) {
         missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate}＝${borrowNendo}年度に対応する名簿ルールがありません)`);
       } else {
