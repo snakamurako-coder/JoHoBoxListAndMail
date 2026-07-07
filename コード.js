@@ -139,20 +139,25 @@ function registerStaffEmail(id, name, email) {
   return name + " 先生のメールアドレスを新規登録しました。";
 }
 
+function normalizeName(name) {
+  return String(name || "").trim().replace(/[\s　]+/g, "");
+}
+
 function normalizeTo4DigitId(classInfo, name) {
   let match = classInfo.match(/(中学|高校).*?(\d+)年([A-Za-z0-9]+)組(\d+)番/);
   if (!match) return "STAFF_" + name.replace(/[\s ]+/g, ""); 
   return `${match[2]}${match[3]}${String(match[4]).padStart(2, '0')}`;
 }
 
-// ルールに基づいて特定シートの名簿Mapを生成する
-function getRosterMapForRule(rule) {
+// ルールに基づいて特定シートの名簿Mapを生成する（ID照合と氏名照合の両方）
+function getRosterMapsForRule(rule) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(rule.sheetName);
   if (!sheet) return null;
   
   let data = sheet.getDataRange().getValues();
-  let map = {};
+  let byId = {};
+  let byName = {};
   
   for (let i = 1; i < data.length; i++) {
     let row = data[i];
@@ -170,9 +175,36 @@ function getRosterMapForRule(rule) {
     }
     
     let email = rule.emailCol ? String(row[parseInt(rule.emailCol) - 1] || "").trim() : "";
-    if (id && email) map[id] = email;
+    let rosterName = rule.nameCol ? String(row[parseInt(rule.nameCol) - 1] || "").trim() : "";
+    
+    if (id && email) byId[id] = email;
+    if (rosterName && email) byName[normalizeName(rosterName)] = email;
   }
-  return map;
+  return { byId, byName };
+}
+
+// 貸出日が属する年度の名簿ルールを取得（年をまたぐ未返却は貸出年度の名簿を使う）
+function findRuleForBorrowDate(rules, bDate) {
+  for (let i = 0; i < rules.length; i++) {
+    let rule = rules[i];
+    let start = new Date(rule.start).getTime();
+    let end = new Date(rule.end).getTime();
+    if (bDate >= start && bDate <= end) return rule;
+  }
+  return null;
+}
+
+// 名簿からメールアドレスを照合（年をまたぐ督促は氏名照合を優先）
+function lookupEmailInRoster(maps, rule, studentName, id) {
+  let nameKey = normalizeName(studentName);
+  if (rule.nameCol && nameKey && maps.byName[nameKey]) {
+    return maps.byName[nameKey];
+  }
+  // 氏名列未設定時のみID照合（同年以内の貸出向け。年をまたぐ場合は氏名列必須）
+  if (!rule.nameCol && id && maps.byId[id]) {
+    return maps.byId[id];
+  }
+  return "";
 }
 
 // 送信と予約のメイン処理
@@ -204,28 +236,22 @@ function processMails(payload) {
 
     let email = "";
     let ruleMatched = false;
+    let matchedRule = null;
 
     if (isStaff) {
       if (!rosterCache['STAFF']) rosterCache['STAFF'] = loadStaffRoster();
       email = rosterCache['STAFF'][id] || "";
       ruleMatched = true;
     } else {
-      for (let i = 0; i < rules.length; i++) {
-        let rule = rules[i];
-        let targetDate = (rule.dateType === 'due') ? dDate : bDate;
-        let start = new Date(rule.start).getTime();
-        let end = new Date(rule.end).getTime();
-        
-        if (targetDate >= start && targetDate <= end) {
-          ruleMatched = true;
-          let cacheKey = rule.sheetName;
-          if (!rosterCache[cacheKey]) {
-            let map = getRosterMapForRule(rule);
-            rosterCache[cacheKey] = map !== null ? map : {};
-          }
-          email = rosterCache[cacheKey][id] || "";
-          break;
+      matchedRule = findRuleForBorrowDate(rules, bDate);
+      if (matchedRule) {
+        ruleMatched = true;
+        let cacheKey = matchedRule.sheetName;
+        if (!rosterCache[cacheKey]) {
+          let maps = getRosterMapsForRule(matchedRule);
+          rosterCache[cacheKey] = maps !== null ? maps : { byId: {}, byName: {} };
         }
+        email = lookupEmailInRoster(rosterCache[cacheKey], matchedRule, r.name, id);
       }
     }
     
@@ -240,9 +266,11 @@ function processMails(payload) {
       if (isStaff) {
         missingEmails.add(`教職員: ${r.name} (画面の青文字をクリックして登録可能)`);
       } else if (!ruleMatched) {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対する適用ルールがありません)`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (貸出日: ${r.borrowDate} に対応する名簿ルールがありません)`);
+      } else if (!matchedRule.nameCol) {
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」のルールに氏名列が未設定です。詳細設定で氏名列を指定してください)`);
       } else {
-        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (適用された名簿シート内でID[${id}]が見つかりません)`);
+        missingEmails.add(`生徒: ${r.classInfo} ${r.name} (名簿「${matchedRule.sheetName}」に氏名「${r.name}」が見つかりません)`);
       }
     }
 
@@ -251,8 +279,9 @@ function processMails(payload) {
       dueDateObj.setHours(0, 0, 0, 0);
 
       if (dueDateObj < today) {
-        if (!grouped.overdue[id]) grouped.overdue[id] = { user: r, books: [] };
-        grouped.overdue[id].books.push(`・『${r.title}』（期限: ${r.dueDate}）`);
+        let groupKey = email || ('NOEMAIL_' + normalizeName(r.name) + '_' + r.borrowDate);
+        if (!grouped.overdue[groupKey]) grouped.overdue[groupKey] = { user: r, books: [] };
+        grouped.overdue[groupKey].books.push(`・『${r.title}』（期限: ${r.dueDate}）`);
       } else {
         grouped.scheduled.push(r);
       }
@@ -316,11 +345,11 @@ function processDailyScheduledEmails() {
     dueDate.setHours(0,0,0,0);
 
     if (dueDate.getTime() === tomorrow.getTime()) {
-      let id = row[0];
-      if (!groupedReminder[id]) {
-        groupedReminder[id] = { name: row[1], classInfo: row[2], email: row[6], books: [] };
+      let groupKey = row[6] || ('NOEMAIL_' + normalizeName(String(row[1])));
+      if (!groupedReminder[groupKey]) {
+        groupedReminder[groupKey] = { name: row[1], classInfo: row[2], email: row[6], books: [] };
       }
-      groupedReminder[id].books.push(`・『${row[3]}』（期限: ${row[5]}）`);
+      groupedReminder[groupKey].books.push(`・『${row[3]}』（期限: ${row[5]}）`);
     } else if (dueDate > tomorrow) {
       newData.push(row);
     }

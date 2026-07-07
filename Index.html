@@ -42,8 +42,12 @@
       .ng-mark { color: #e74c3c; font-weight: bold; font-size: 16px; }
       
       /* 印刷レイアウト */
-      .class-section { margin-bottom: 30px; page-break-after: always; }
+      .list-type-header { font-size: 20px; margin: 40px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid #ccc; }
+      .list-type-header:first-child { margin-top: 0; }
+      .nendo-section { margin-bottom: 30px; page-break-after: always; }
+      .class-section { margin-bottom: 20px; }
       .class-header { font-size: 18px; border-bottom: 2px solid #ccc; margin-bottom: 10px; padding-bottom: 5px; }
+      .nendo-title { font-size: 16px; margin: 0 0 15px 0; padding: 8px 12px; background: #f8f9fa; border-left: 4px solid #3498db; }
       .two-col-layout { display: flex; gap: 15px; align-items: flex-start; }
       .col-table { width: 50%; font-size: 13px; border-collapse: collapse; }
       .col-table th, .col-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
@@ -60,7 +64,9 @@
         #printSection, #printSection * { visibility: visible; }
         #printSection { position: absolute; left: 0; top: 0; width: 100%; }
         .no-print { display: none !important; }
-        .class-section:last-child { page-break-after: auto; }
+        .nendo-section:last-child { page-break-after: auto; }
+        .list-type-header { page-break-before: always; }
+        .list-type-header:first-child { page-break-before: auto; }
         .col-table { font-size: 12px; }
         .col-table th, .col-table td { padding: 4px; }
         .staff-link { text-decoration: none; color: inherit; }
@@ -107,7 +113,7 @@
 
       <div style="margin-bottom: 20px;" class="no-print">
         <button class="btn btn-primary" id="sendBtn" onclick="executeMails()" disabled style="margin-right: 15px; font-size: 16px; padding: 12px 24px;">一括処理を実行（即時督促 ＋ 予約更新）</button>
-        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled style="font-size: 16px; padding: 12px 24px;">年度・クラス別リストを印刷する</button>
+        <button class="btn btn-success" id="printBtn" onclick="window.print()" disabled style="font-size: 16px; padding: 12px 24px;">年度別リストを印刷する</button>
       </div>
 
       <hr class="no-print" style="border:1px solid #eee; margin:30px 0;">
@@ -155,7 +161,8 @@
           <strong>【名簿管理の手順と注意事項】</strong><br>
           ① <strong>名簿の登録</strong>：Excel等から「学年・組・番号・メールアドレス」の表をコピーし、下の「A」欄に貼り付けてシートを作成します。<br>
           ② <strong>ルールの紐付け</strong>：追加したシートを選び、どの列がIDやアドレスに該当するかを選択します。同じ見出し名（例:学年）が複数あっても、自動で列アルファベットが付与されるので正確に選べます。<br>
-          ③ <strong>年度の自動補完</strong>：開始日を選択すると、終了日は自動的に「翌年の3月31日」にセットされます。必要に応じて手動で微調整してください。
+          ③ <strong>氏名列は必須</strong>：図書データのクラス表示は「現在の学年・組」になるため、年をまたいだ督促では4桁IDではなく<strong>氏名</strong>で名簿照合します。各年度の名簿に氏名列を必ず指定してください。<br>
+          ④ <strong>年度の自動補完</strong>：開始日を選択すると、終了日は自動的に「翌年の3月31日」にセットされます。必要に応じて手動で微調整してください。
         </div>
         
         <div class="section" style="background:white;">
@@ -195,7 +202,7 @@
               <div class="form-item"><label>学年列（IDが無い場合必須）</label><select id="ruleGradeCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>組列（IDが無い場合必須）</label><select id="ruleClassCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>番号列（IDが無い場合必須）</label><select id="ruleNumCol"><option value="">-- シートを選択してください --</option></select></div>
-              <div class="form-item"><label>氏名列（任意）</label><select id="ruleNameCol"><option value="">-- シートを選択してください --</option></select></div>
+              <div class="form-item"><label>氏名列（年をまたぐ督促に必須）</label><select id="ruleNameCol"><option value="">-- シートを選択してください --</option></select></div>
               <div class="form-item"><label>メール列（必須）</label><select id="ruleEmailCol"><option value="">-- シートを選択してください --</option></select></div>
             </div>
             
@@ -206,7 +213,7 @@
       </div>
 
       <div id="printSection">
-        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むとここに年度・クラス別のプレビューが生成されます</div>
+        <div style="text-align:center; color:#999; margin-top:20px;" class="no-print">ファイルを読み込むとここに年度別の督促・自動予約リストが生成されます</div>
       </div>
     </div>
 
@@ -383,11 +390,11 @@
         }
         systemRules.forEach((r, index) => {
           let card = document.createElement('div'); card.className = 'rule-card';
-          let dateLbl = r.dateType === 'due' ? '返却日' : '貸出日';
+          let nameColWarn = r.nameCol ? '' : ' <span style="color:#c0392b;">⚠ 氏名列未設定</span>';
           card.innerHTML = `
             <button class="btn-danger" style="position:absolute; right:15px; top:15px;" onclick="deleteRule(${index})">削除</button>
-            <h4>ルール ${index + 1}: ${r.sheetName}</h4>
-            <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> ${dateLbl}が ${r.start} ～ ${r.end} の場合適用</p>
+            <h4>ルール ${index + 1}: ${r.sheetName}${nameColWarn}</h4>
+            <p style="font-size:13px; margin:5px 0;"><strong>条件：</strong> 貸出日が ${r.start} ～ ${r.end} の名簿を使用（氏名で照合）</p>
           `;
           container.appendChild(card);
         });
@@ -409,6 +416,7 @@
         };
 
         if(!rule.start || !rule.end || !rule.sheetName || !rule.emailCol) return alert("「期間」「対象シート」「メール列」は必須です。");
+        if(!rule.nameCol) return alert("年をまたぐ督促のため「氏名列」の指定が必須です。");
         if(!rule.idCol && (!rule.gradeCol || !rule.classCol || !rule.numCol)) return alert("照合のため「4桁ID列」か、または「学年・組・番号の全3列」のどちらかを選択してください。");
 
         systemRules.push(rule);
@@ -526,7 +534,7 @@
         return (classInfo.includes("中学") ? "1_" : "2_") + id;
       }
 
-      // ★年度別のセクション分割と描画処理
+      // 年度別のセクション分割と描画処理（印刷時は年度ごとに改ページ）
       function renderPrintLayout() {
         const printSection = document.getElementById('printSection'); 
         printSection.innerHTML = ''; 
@@ -538,12 +546,21 @@
           if (dueDate < today) overdueRecords.push(r); else futureRecords.push(r);
         });
 
-        // 共通関数：年度別にグループ化して描画
-        function buildNendoSections(records, statusLabel, isNoPrint) {
+        function buildNendoSections(records, statusLabel, listTitle) {
+          let titleColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
+          let borderColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
+
+          let listHeader = document.createElement('h2');
+          listHeader.className = 'list-type-header';
+          listHeader.innerText = listTitle;
+          listHeader.style.color = titleColor;
+          listHeader.style.borderBottomColor = borderColor;
+          printSection.appendChild(listHeader);
+
           if (records.length === 0) {
             let noData = document.createElement('div');
-            if (isNoPrint) noData.className = 'no-print';
             noData.style.marginBottom = '30px';
+            noData.style.color = '#7f8c8d';
             noData.innerText = `現在、${statusLabel}対象のデータはありません。`;
             printSection.appendChild(noData);
             return;
@@ -555,7 +572,6 @@
             byNendo[r.nendo].push(r);
           });
 
-          // 年度を降順（新しい順）に並び替え
           let nendos = Object.keys(byNendo).sort((a, b) => {
             if (a === "不明") return 1;
             if (b === "不明") return -1;
@@ -564,30 +580,24 @@
 
           nendos.forEach(nendo => {
             let nendoRecords = byNendo[nendo];
-            let titleColor = statusLabel === '督促' ? '#c0392b' : '#27ae60';
-            let titleIcon = statusLabel === '督促' ? '🔴' : '🟢';
-            let printNote = statusLabel === '督促' ? '印刷用' : '画面確認用・印刷されません';
+            let nendoSection = document.createElement('div');
+            nendoSection.className = 'nendo-section';
 
             let nendoTitle = document.createElement('h3');
-            if (isNoPrint) nendoTitle.className = 'no-print';
-            nendoTitle.innerText = `${titleIcon} ${statusLabel}対象リスト（${nendo}年度 貸出分 / ${printNote}: ${nendoRecords.length}件）`;
-            nendoTitle.style.color = titleColor;
-            nendoTitle.style.borderBottom = `2px solid ${titleColor}`;
-            nendoTitle.style.marginTop = '30px';
-            printSection.appendChild(nendoTitle);
+            nendoTitle.className = 'nendo-title';
+            nendoTitle.innerText = `${nendo}年度（貸出分 ${nendoRecords.length}件）`;
+            nendoTitle.style.borderLeftColor = borderColor;
+            nendoSection.appendChild(nendoTitle);
 
-            let container = document.createElement('div');
-            if (isNoPrint) container.className = 'no-print';
-            
             let groupedClasses = groupRecordsByClass(nendoRecords);
-            buildSectionHtml(groupedClasses, container, statusLabel, nendo);
-            
-            printSection.appendChild(container);
+            buildSectionHtml(groupedClasses, nendoSection, statusLabel);
+
+            printSection.appendChild(nendoSection);
           });
         }
 
-        buildNendoSections(overdueRecords, '督促', false);
-        buildNendoSections(futureRecords, '予約', true);
+        buildNendoSections(overdueRecords, '督促', '督促対象リスト');
+        buildNendoSections(futureRecords, '予約', '自動予約対象リスト');
       }
 
       function groupRecordsByClass(records) {
@@ -603,16 +613,15 @@
         return grouped;
       }
 
-      function buildSectionHtml(groupedByClass, containerElement, statusLabel, nendo) {
+      function buildSectionHtml(groupedByClass, containerElement, statusLabel) {
         for (let key in groupedByClass) {
           let group = groupedByClass[key]; let recs = group.records;
           let sectionDiv = document.createElement('div'); 
-          sectionDiv.className = statusLabel === '督促' ? 'class-section' : ''; 
-          sectionDiv.style.marginBottom = '20px';
+          sectionDiv.className = 'class-section';
           
           let header = document.createElement('div'); 
           header.className = 'class-header'; 
-          header.innerHTML = `クラス: ${key} (${group.className}) <span style="font-size:14px; color:#555; margin-left:15px;">[${nendo}年度 貸出分]</span>`; 
+          header.innerHTML = `クラス: ${key} (${group.className})`; 
           sectionDiv.appendChild(header);
           
           let flexDiv = document.createElement('div'); 
